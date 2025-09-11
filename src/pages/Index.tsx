@@ -4,8 +4,11 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Dumbbell, Target, TrendingUp, Clock, Trophy, Flame, Activity, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const navigate = useNavigate();
+  
   // Mock data - in real app this would come from your backend
   const todayWorkouts = [
     { id: 1, name: "Upper Body Strength", time: "9:00 AM", status: "scheduled" },
@@ -33,7 +36,12 @@ const Index = () => {
             <p className="text-lg md:text-xl opacity-90 max-w-2xl">
               Plan workouts, track progress, and achieve your fitness goals with our comprehensive tracker.
             </p>
-            <Button variant="hero" size="lg" className="mt-6">
+            <Button 
+              variant="hero" 
+              size="lg" 
+              className="mt-6"
+              onClick={() => navigate('/workout/new')}
+            >
               <Plus className="mr-2 h-5 w-5" />
               Start New Workout
             </Button>
