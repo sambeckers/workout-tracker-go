@@ -220,7 +220,7 @@ const WorkoutSession = () => {
                         className="w-20 h-9"
                         disabled={set.completed}
                       />
-                      <span className="text-sm text-muted-foreground">lbs</span>
+                      <span className="text-sm text-muted-foreground">kg</span>
                     </div>
 
                     <Button

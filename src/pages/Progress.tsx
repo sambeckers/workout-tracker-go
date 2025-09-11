@@ -21,9 +21,9 @@ const Progress = () => {
   ];
 
   const exerciseProgress = [
-    { name: "Bench Press", currentMax: "185 lbs", previousMax: "175 lbs", improvement: "+10 lbs" },
-    { name: "Squats", currentMax: "225 lbs", previousMax: "215 lbs", improvement: "+10 lbs" },
-    { name: "Deadlifts", currentMax: "275 lbs", previousMax: "265 lbs", improvement: "+10 lbs" },
+    { name: "Bench Press", currentMax: "84 kg", previousMax: "79 kg", improvement: "+5 kg" },
+    { name: "Squats", currentMax: "102 kg", previousMax: "97 kg", improvement: "+5 kg" },
+    { name: "Deadlifts", currentMax: "125 kg", previousMax: "120 kg", improvement: "+5 kg" },
     { name: "Pull-ups", currentMax: "12 reps", previousMax: "10 reps", improvement: "+2 reps" },
   ];
 
@@ -69,7 +69,7 @@ const Progress = () => {
               <div>
                 <p className="text-white/80">Weight Lifted</p>
                 <p className="text-3xl font-bold">{stats.totalWeightLifted.toLocaleString()}</p>
-                <p className="text-white/70 text-sm">lbs total</p>
+                <p className="text-white/70 text-sm">kg total</p>
               </div>
               <BarChart3 className="h-8 w-8 text-white/80" />
             </div>
@@ -122,7 +122,7 @@ const Progress = () => {
                     </div>
                     <div>
                       <p className="font-medium">{month.workouts} workouts</p>
-                      <p className="text-sm text-muted-foreground">{month.totalWeight.toLocaleString()} lbs lifted</p>
+                      <p className="text-sm text-muted-foreground">{month.totalWeight.toLocaleString()} kg lifted</p>
                     </div>
                   </div>
                   {index > 0 && month.workouts > monthlyData[index - 1].workouts && (
@@ -200,7 +200,7 @@ const Progress = () => {
                   </div>
                   {workout.totalWeight > 0 && (
                     <div className="text-center">
-                      <p className="font-medium">{workout.totalWeight} lbs</p>
+                      <p className="font-medium">{workout.totalWeight} kg</p>
                       <p className="text-muted-foreground">Total Weight</p>
                     </div>
                   )}

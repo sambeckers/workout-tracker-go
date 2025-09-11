@@ -16,9 +16,9 @@ const Index = () => {
   ];
 
   const recentActivity = [
-    { id: 1, exercise: "Bench Press", sets: "3x8", weight: "185 lbs", date: "Today" },
-    { id: 2, exercise: "Squats", sets: "4x10", weight: "225 lbs", date: "Yesterday" },
-    { id: 3, exercise: "Deadlifts", sets: "3x5", weight: "275 lbs", date: "2 days ago" },
+    { id: 1, exercise: "Bench Press", sets: "3x8", weight: "84 kg", date: "Today" },
+    { id: 2, exercise: "Squats", sets: "4x10", weight: "102 kg", date: "Yesterday" },
+    { id: 3, exercise: "Deadlifts", sets: "3x5", weight: "125 kg", date: "2 days ago" },
   ];
 
   return (

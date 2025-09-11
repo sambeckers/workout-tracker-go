@@ -2,10 +2,26 @@ import { useState } from "react";
 import { Camera, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import heroImage from "@/assets/hero-fitness.jpg";
 
 const CoverArea = () => {
   const [coverImage, setCoverImage] = useState(heroImage);
+  const { toast } = useToast();
+
+  const handleChangeCover = () => {
+    toast({
+      title: "Change Cover",
+      description: "Cover image functionality will be implemented soon.",
+    });
+  };
+
+  const handleChangeAvatar = () => {
+    toast({
+      title: "Change Avatar", 
+      description: "Avatar upload functionality will be implemented soon.",
+    });
+  };
 
   return (
     <div className="relative">
@@ -16,7 +32,12 @@ const CoverArea = () => {
       >
         {/* Cover Image Controls */}
         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="secondary" size="sm" className="gap-2 bg-white/90 text-gray-700 hover:bg-white">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            className="gap-2 bg-white/90 text-gray-700 hover:bg-white"
+            onClick={handleChangeCover}
+          >
             <Camera className="h-4 w-4" />
             Change cover
           </Button>
@@ -35,6 +56,7 @@ const CoverArea = () => {
               variant="ghost" 
               size="icon" 
               className="absolute -bottom-1 -right-1 h-6 w-6 bg-white hover:bg-gray-50 border border-gray-200 rounded-full"
+              onClick={handleChangeAvatar}
             >
               <Camera className="h-3 w-3 text-gray-600" />
             </Button>
