@@ -6,53 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Target, Calendar, TrendingUp, Trophy, Edit, Trash2 } from "lucide-react";
 
 const Goals = () => {
-  // Mock goals data
-  const goals = [
-    {
-      id: 1,
-      title: "Bench Press 91kg",
-      category: "Strength",
-      current: 84,
-      target: 91,
-      unit: "kg",
-      deadline: "2024-03-01",
-      status: "active",
-      progress: 92.5,
-    },
-    {
-      id: 2,
-      title: "Run 5K under 25 minutes",
-      category: "Cardio",
-      current: 26.5,
-      target: 25,
-      unit: "min",
-      deadline: "2024-02-15",
-      status: "active",
-      progress: 75,
-    },
-    {
-      id: 3,
-      title: "Workout 4x per week",
-      category: "Consistency",
-      current: 3,
-      target: 4,
-      unit: "workouts/week",
-      deadline: "2024-12-31",
-      status: "active",
-      progress: 75,
-    },
-    {
-      id: 4,
-      title: "Deadlift 136kg",
-      category: "Strength",
-      current: 136,
-      target: 136,
-      unit: "kg",
-      deadline: "2024-01-15",
-      status: "completed",
-      progress: 100,
-    },
-  ];
+  // Empty goals array - will be populated from database later
+  const goals: any[] = [];
 
   const categories = ["All", "Strength", "Cardio", "Weight Loss", "Consistency"];
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -89,7 +44,7 @@ const Goals = () => {
 
   const activeGoals = goals.filter(goal => goal.status === "active").length;
   const completedGoals = goals.filter(goal => goal.status === "completed").length;
-  const averageProgress = goals.reduce((sum, goal) => sum + goal.progress, 0) / goals.length;
+  const averageProgress = goals.length > 0 ? goals.reduce((sum, goal) => sum + goal.progress, 0) / goals.length : 0;
 
   return (
     <div className="space-y-6">

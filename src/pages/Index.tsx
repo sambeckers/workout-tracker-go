@@ -1,88 +1,69 @@
-import heroImage from "@/assets/hero-fitness.jpg";
 import StatsCard from "@/components/dashboard/StatsCard";
 import QuickActions from "@/components/dashboard/QuickActions";
+import HeroGallery from "@/components/layout/HeroGallery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Dumbbell, Target, TrendingUp, Clock, Trophy, Flame, Activity, Plus } from "lucide-react";
+import { Calendar, Dumbbell, Target, TrendingUp, Clock, Trophy, Flame, Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
-  // Mock data - in real app this would come from your backend
-  const todayWorkouts = [
-    { id: 1, name: "Upper Body Strength", time: "9:00 AM", status: "scheduled" },
-    { id: 2, name: "Cardio Session", time: "6:00 PM", status: "scheduled" },
-  ];
-
-  const recentActivity = [
-    { id: 1, exercise: "Bench Press", sets: "3x8", weight: "84 kg", date: "Today" },
-    { id: 2, exercise: "Squats", sets: "4x10", weight: "102 kg", date: "Yesterday" },
-    { id: 3, exercise: "Deadlifts", sets: "3x5", weight: "125 kg", date: "2 days ago" },
-  ];
+  // Mock user for development when authentication is bypassed
+  const mockUser = {
+    user_metadata: { name: "Sam Beckers", avatar_url: "" },
+    email: "sam@example.com"
+  };
+  
+  const displayUser = user || mockUser;
+  const userName = displayUser?.user_metadata?.name?.split(' ')[0] || displayUser?.email?.split('@')[0] || 'User';
+  
+  // Empty data arrays - will be populated from database later
+  const todayWorkouts: any[] = [];
+  const recentActivity: any[] = [];
 
   return (
-    <div className="space-y-8">
-      {/* Hero Section */}
-      <div className="relative rounded-2xl overflow-hidden shadow-lg">
-        <div 
-          className="h-64 md:h-80 bg-cover bg-center flex items-center justify-center"
-          style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${heroImage})` }}
-        >
-          <div className="text-center text-white space-y-4">
-            <h1 className="text-4xl md:text-6xl font-bold">
-              Track Your <span className="bg-gradient-hero bg-clip-text text-transparent">Fitness Journey</span>
-            </h1>
-            <p className="text-lg md:text-xl opacity-90 max-w-2xl">
-              Plan workouts, track progress, and achieve your fitness goals with our comprehensive tracker.
-            </p>
-            <Button 
-              variant="hero" 
-              size="lg" 
-              className="mt-6"
-              onClick={() => navigate('/workout/new')}
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Start New Workout
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-4 md:space-y-8">
+      {/* Hero Gallery Section */}
+      <HeroGallery 
+        userName={userName}
+        onStartWorkout={() => navigate('/workout/new')}
+      />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
         <StatsCard
           title="Total Workouts"
-          value={47}
+          value={0}
           subtitle="This month"
           icon={Dumbbell}
-          trend={{ value: 12, isPositive: true }}
           variant="primary"
         />
         <StatsCard
           title="Active Goals"
-          value={3}
+          value={0}
           subtitle="In progress"
           icon={Target}
           variant="secondary"
         />
         <StatsCard
           title="Weekly Streak"
-          value={12}
+          value={0}
           subtitle="Days"
           icon={Flame}
-          trend={{ value: 8, isPositive: true }}
           variant="accent"
         />
         <StatsCard
           title="Average Duration"
-          value="68 min"
+          value="0 min"
           subtitle="Per session"
           icon={Clock}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-1">
           <QuickActions />
@@ -119,7 +100,11 @@ const Index = () => {
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No workouts scheduled for today</p>
-                  <Button variant="outline" className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => navigate('/schedule')}
+                  >
                     Schedule Workout
                   </Button>
                 </div>
@@ -138,22 +123,32 @@ const Index = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentActivity.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-              >
-                <div>
-                  <h4 className="font-medium">{activity.exercise}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {activity.sets} @ {activity.weight}
-                  </p>
+          {recentActivity.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivity.map((activity) => (
+                <div
+                  key={activity.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
+                  <div>
+                    <h4 className="font-medium">{activity.exercise}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {activity.sets} @ {activity.weight}
+                    </p>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{activity.date}</span>
                 </div>
-                <span className="text-sm text-muted-foreground">{activity.date}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No recent activity to show</p>
+              <Button variant="outline" className="mt-4" onClick={() => navigate('/workout/new')}>
+                Start First Workout
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

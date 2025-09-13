@@ -24,13 +24,26 @@ const StatsCard = ({
   const getCardStyles = () => {
     switch (variant) {
       case "primary":
-        return "bg-gradient-primary text-white shadow-glow";
+        return "text-white shadow-glow border-0";
       case "secondary":
-        return "bg-gradient-secondary text-white shadow-lg";
+        return "text-white shadow-lg border-0";
       case "accent":
-        return "bg-gradient-accent text-white shadow-lg";
+        return "text-white shadow-lg border-0";
       default:
-        return "bg-gradient-card shadow-md hover:shadow-lg";
+        return "shadow-md hover:shadow-lg border-0";
+    }
+  };
+
+  const getCardBackground = () => {
+    switch (variant) {
+      case "primary":
+        return { background: "var(--gradient-primary)" };
+      case "secondary":
+        return { background: "var(--gradient-secondary)" };
+      case "accent":
+        return { background: "var(--gradient-accent)" };
+      default:
+        return { background: "var(--gradient-card)" };
     }
   };
 
@@ -46,7 +59,7 @@ const StatsCard = ({
   };
 
   return (
-    <Card className={`${getCardStyles()} transition-smooth border-0`}>
+    <Card className={`${getCardStyles()} transition-smooth`} style={getCardBackground()}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className={`text-sm font-medium ${variant !== "default" ? "text-white/90" : "text-muted-foreground"}`}>
           {title}

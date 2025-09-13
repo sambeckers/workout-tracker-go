@@ -52,6 +52,32 @@ export default {
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         info: "hsl(var(--info))",
+        // Red color palette variants
+        red: {
+          50: "hsl(0 85% 97%)",
+          100: "hsl(0 85% 94%)",
+          200: "hsl(0 85% 87%)",
+          300: "hsl(0 85% 77%)",
+          400: "hsl(0 85% 65%)",
+          500: "hsl(0 85% 60%)", // Primary red
+          600: "hsl(0 85% 55%)",
+          700: "hsl(0 75% 45%)",
+          800: "hsl(0 65% 35%)",
+          900: "hsl(0 55% 25%)",
+        },
+        // Coral/Pink variants
+        coral: {
+          300: "hsl(15 85% 75%)",
+          400: "hsl(15 75% 65%)", // Secondary coral
+          500: "hsl(15 75% 60%)",
+          600: "hsl(15 75% 55%)",
+        },
+        // Rose variants
+        rose: {
+          400: "hsl(345 85% 70%)",
+          500: "hsl(345 85% 65%)", // Accent rose
+          600: "hsl(345 85% 60%)",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

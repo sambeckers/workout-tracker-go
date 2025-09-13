@@ -41,17 +41,17 @@ const QuickActions = () => {
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {actions.map((action) => (
             <Link key={action.label} to={action.href}>
               <Button
                 variant={action.variant}
-                className="w-full h-auto p-4 flex-col gap-2 text-left"
+                className="w-full h-auto p-2 sm:p-4 flex-col gap-1 sm:gap-2 text-center min-h-[80px] sm:min-h-[100px]"
               >
-                <action.icon className="h-6 w-6" />
-                <div>
-                  <div className="font-semibold text-sm">{action.label}</div>
-                  <div className="text-xs opacity-80">{action.description}</div>
+                <action.icon className="h-4 w-4 sm:h-6 sm:w-6" />
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-semibold text-xs sm:text-sm leading-tight">{action.label}</div>
+                  <div className="text-[10px] sm:text-xs opacity-80 leading-tight hidden sm:block">{action.description}</div>
                 </div>
               </Button>
             </Link>

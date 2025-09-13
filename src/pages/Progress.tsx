@@ -4,36 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Calendar, Dumbbell, Activity, Target, BarChart3 } from "lucide-react";
 
 const Progress = () => {
-  // Mock data for charts and progress
+  // Empty data arrays - will be populated from database later
   const stats = {
-    totalWorkouts: 147,
-    totalWeightLifted: 25420,
-    averageWorkoutTime: 67,
-    currentStreak: 12,
+    totalWorkouts: 0,
+    totalWeightLifted: 0,
+    averageWorkoutTime: 0,
+    currentStreak: 0,
   };
 
-  const recentWorkouts = [
-    { date: "2024-01-15", type: "Upper Body", duration: 65, exercises: 8, totalWeight: 1850 },
-    { date: "2024-01-14", type: "Cardio", duration: 45, exercises: 5, totalWeight: 0 },
-    { date: "2024-01-13", type: "Lower Body", duration: 75, exercises: 6, totalWeight: 2100 },
-    { date: "2024-01-12", type: "Full Body", duration: 80, exercises: 10, totalWeight: 1650 },
-    { date: "2024-01-11", type: "Upper Body", duration: 60, exercises: 7, totalWeight: 1750 },
-  ];
-
-  const exerciseProgress = [
-    { name: "Bench Press", currentMax: "84 kg", previousMax: "79 kg", improvement: "+5 kg" },
-    { name: "Squats", currentMax: "102 kg", previousMax: "97 kg", improvement: "+5 kg" },
-    { name: "Deadlifts", currentMax: "125 kg", previousMax: "120 kg", improvement: "+5 kg" },
-    { name: "Pull-ups", currentMax: "12 reps", previousMax: "10 reps", improvement: "+2 reps" },
-  ];
-
-  const monthlyData = [
-    { month: "Sep", workouts: 16, totalWeight: 8500 },
-    { month: "Oct", workouts: 18, totalWeight: 9200 },
-    { month: "Nov", workouts: 20, totalWeight: 10100 },
-    { month: "Dec", workouts: 22, totalWeight: 11400 },
-    { month: "Jan", workouts: 15, totalWeight: 8200 }, // Current month (partial)
-  ];
+  const recentWorkouts: any[] = [];
+  const exerciseProgress: any[] = [];
+  const monthlyData: any[] = [];
 
   return (
     <div className="space-y-6">
