@@ -24,12 +24,31 @@ const AuthCallback = () => {
           return;
         }
 
-        // Check if this is an email confirmation
+        // Check if this is an email confirmation or password reset
         const type = searchParams.get("type");
         const accessToken = searchParams.get("access_token");
         const refreshToken = searchParams.get("refresh_token");
 
-        if (type === "signup" && accessToken && refreshToken) {
+        if (type === "recovery" && accessToken && refreshToken) {
+          // This is a password reset - set the session and redirect to reset password page
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            toast({
+              title: "Error",
+              description: "Invalid or expired password reset link. Please request a new one.",
+              variant: "destructive",
+            });
+            navigate("/forgot-password");
+            return;
+          }
+
+          // Redirect to reset password page with tokens
+          navigate(`/reset-password?access_token=${accessToken}&refresh_token=${refreshToken}`);
+        } else if (type === "signup" && accessToken && refreshToken) {
           // Set the session with the tokens from the URL
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
