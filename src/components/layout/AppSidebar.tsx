@@ -289,6 +289,7 @@ const AppSidebar = () => {
                     <button
                       onClick={async () => {
                         await signOut();
+                        navigate("/login");
                         toast({
                           title: "Signed out",
                           description: "You have been successfully signed out.",
