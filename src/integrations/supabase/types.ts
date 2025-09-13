@@ -16,40 +16,53 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
           id: string
-          updated_at: string
-          user_id: string
           username: string | null
+          full_name: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          updated_at?: string
-          user_id: string
+          id: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
           id?: string
-          updated_at?: string
-          user_id?: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_email_by_username: {
+        Args: {
+          username_input: string
+        }
+        Returns: string | null
+      }
     }
     Enums: {
       [_ in never]: never
