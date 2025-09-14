@@ -137,15 +137,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const resetPassword = async (email: string) => {
     try {
-      // Use dynamic URL that works on any port
-      const redirectUrl = `${window.location.protocol}//${window.location.host}/reset-password`;
-      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
       return { error };
     } catch (error) {
-      console.error('Reset password error:', error);
       return { error };
     }
   };
