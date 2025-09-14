@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Dumbbell, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -14,25 +15,65 @@ const ResetPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [searchParams] = useSearchParams();
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
   const { changePassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Check if we have the proper tokens from the URL
-  useEffect(() => {
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (!accessToken || !refreshToken) {
-      toast({
-        title: "Invalid Reset Link",
-        description: "This password reset link is invalid or has expired.",
-        variant: "destructive",
+    // Wait for Supabase to establish session from magic link; attempt code exchange
+    useEffect(() => {
+      let isMounted = true;
+
+      const bootstrap = async () => {
+        const { data } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        if (data.session) {
+          setHasSession(true);
+          setSessionChecked(true);
+        } else {
+          try {
+            // Try to exchange any code in the URL for a session
+            await supabase.auth.exchangeCodeForSession(window.location.href);
+            if (!isMounted) return;
+            const { data: after } = await supabase.auth.getSession();
+            if (after.session) setHasSession(true);
+          } catch (e) {
+            // ignore; will rely on auth state listener below
+          } finally {
+            // Give the listener a moment, then mark checked
+            setTimeout(() => {
+              if (!isMounted) return;
+              setSessionChecked(true);
+            }, 700);
+          }
+        }
+      };
+
+      bootstrap();
+
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!isMounted) return;
+        if (session) setHasSession(true);
       });
-      navigate("/forgot-password");
-    }
-  }, [searchParams, navigate, toast]);
+
+      return () => {
+        isMounted = false;
+        authListener.subscription.unsubscribe();
+      };
+    }, []);
+
+    // If session check completed and no session, redirect to request a new link
+    useEffect(() => {
+      if (sessionChecked && !hasSession) {
+        toast({
+          title: "Reset Link Needed",
+          description: "Please request a new password reset email to continue.",
+          variant: "destructive",
+        });
+        navigate("/forgot-password");
+      }
+    }, [sessionChecked, hasSession, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

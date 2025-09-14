@@ -12,42 +12,15 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          toast({
-            title: "Authentication Error",
-            description: error.message,
-            variant: "destructive",
-          });
-          navigate("/login");
-          return;
-        }
-
-        // Check if this is an email confirmation or password reset
+        // Check if this is an email confirmation or password reset first
         const type = searchParams.get("type");
         const accessToken = searchParams.get("access_token");
         const refreshToken = searchParams.get("refresh_token");
 
         if (type === "recovery" && accessToken && refreshToken) {
-          // This is a password reset - set the session and redirect to reset password page
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (sessionError) {
-            toast({
-              title: "Error",
-              description: "Invalid or expired password reset link. Please request a new one.",
-              variant: "destructive",
-            });
-            navigate("/forgot-password");
-            return;
-          }
-
-          // Redirect to reset password page with tokens
+          // This is a password reset - redirect to reset password page with tokens
           navigate(`/reset-password?access_token=${accessToken}&refresh_token=${refreshToken}`);
+          return;
         } else if (type === "signup" && accessToken && refreshToken) {
           // Set the session with the tokens from the URL
           const { error: sessionError } = await supabase.auth.setSession({
@@ -70,12 +43,27 @@ const AuthCallback = () => {
             description: "Your email has been successfully confirmed. Welcome to FitTracker!",
           });
           navigate("/");
-        } else if (data.session) {
-          // User is already authenticated
-          navigate("/");
         } else {
-          // No valid session, redirect to login
-          navigate("/login");
+          // Check for existing session
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            toast({
+              title: "Authentication Error",
+              description: error.message,
+              variant: "destructive",
+            });
+            navigate("/login");
+            return;
+          }
+
+          if (data.session) {
+            // User is already authenticated
+            navigate("/");
+          } else {
+            // No valid session, redirect to login
+            navigate("/login");
+          }
         }
       } catch (error) {
         console.error("Auth callback error:", error);

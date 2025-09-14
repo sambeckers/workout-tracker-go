@@ -137,8 +137,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
+      // Simpler flow: send a magic sign-in link, then let user set a new password
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/reset-password?from=magic`,
+          shouldCreateUser: false,
+        },
       });
       return { error };
     } catch (error) {
