@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Dumbbell, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -19,7 +20,7 @@ const ResetPassword = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Check if we have the proper tokens from the URL
+  // Check if we have the proper tokens from the URL and set the session
   useEffect(() => {
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
@@ -31,7 +32,38 @@ const ResetPassword = () => {
         variant: "destructive",
       });
       navigate("/forgot-password");
+      return;
     }
+
+    // Set the session with the tokens from the URL
+    const setSessionWithTokens = async () => {
+      try {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) {
+          console.error("Session error:", error);
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired.",
+            variant: "destructive",
+          });
+          navigate("/forgot-password");
+        }
+      } catch (error) {
+        console.error("Failed to set session:", error);
+        toast({
+          title: "Invalid Reset Link", 
+          description: "This password reset link is invalid or has expired.",
+          variant: "destructive",
+        });
+        navigate("/forgot-password");
+      }
+    };
+
+    setSessionWithTokens();
   }, [searchParams, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
