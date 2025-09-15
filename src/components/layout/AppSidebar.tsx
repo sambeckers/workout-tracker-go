@@ -43,26 +43,26 @@ const AppSidebar = () => {
   const showDevModeControls = isAdminAuthenticated;
 
   const mainNavItems = [
-    { icon: Home, label: "Home", path: "/" },
-    { icon: Calendar, label: "Schedule", path: "/schedule" },
-    { icon: Book, label: "Exercises", path: "/exercises" },
-    { icon: Target, label: "Goals", path: "/goals" },
-    { icon: TrendingUp, label: "Progress", path: "/progress" },
+    { icon: Home, label: "Home", path: "/dashboard" },
+    { icon: Calendar, label: "Schedule", path: "/dashboard/schedule" },
+    { icon: Book, label: "Exercises", path: "/dashboard/exercises" },
+    { icon: Target, label: "Goals", path: "/dashboard/goals" },
+    { icon: TrendingUp, label: "Progress", path: "/dashboard/progress" },
   ];
 
   const quickActions = [
-    { icon: Plus, label: "New Workout", path: "/workout/new" },
-    { icon: Dumbbell, label: "Quick Session", path: "/workout/quick" },
-    { icon: Target, label: "Add Goal", path: "/goals/new" },
+    { icon: Plus, label: "New Workout", path: "/dashboard/workout/new" },
+    { icon: Dumbbell, label: "Quick Session", path: "/dashboard/workout/quick" },
+    { icon: Target, label: "Add Goal", path: "/dashboard/goals/new" },
   ];
 
   const isActivePath = (path: string) => {
-    if (path === "/") return location.pathname === "/";
+    if (path === "/dashboard") return location.pathname === "/dashboard" || location.pathname === "/dashboard/";
     return location.pathname.startsWith(path);
   };
 
   const handleSettings = () => {
-    navigate("/settings");
+    navigate("/dashboard/settings");
   };
 
   const handleDevModeToggle = () => {
@@ -101,7 +101,7 @@ const AppSidebar = () => {
         {/* Header */}
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <button 
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
           >
             <div className="p-1.5 bg-gradient-primary rounded-md">
@@ -257,10 +257,10 @@ const AppSidebar = () => {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <Link
-                    to="/settings"
+                    to="/dashboard/settings"
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors",
-                      isActivePath("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground"
+                      isActivePath("/dashboard/settings") && "bg-sidebar-accent text-sidebar-accent-foreground"
                     )}
                   >
                     <Settings className="h-4 w-4" />
@@ -289,7 +289,7 @@ const AppSidebar = () => {
                     <button
                       onClick={async () => {
                         await signOut();
-                        navigate("/login");
+                        navigate("/");
                         toast({
                           title: "Signed out",
                           description: "You have been successfully signed out.",

@@ -29,7 +29,7 @@ const Index = () => {
       {/* Hero Gallery Section */}
       <HeroGallery 
         userName={userName}
-        onStartWorkout={() => navigate('/workout/new')}
+        onStartWorkout={() => navigate('/dashboard/workout/new')}
       />
 
       {/* Stats Grid */}
@@ -103,7 +103,7 @@ const Index = () => {
                   <Button 
                     variant="outline" 
                     className="mt-4"
-                    onClick={() => navigate('/schedule')}
+                    onClick={() => navigate('/dashboard/schedule')}
                   >
                     Schedule Workout
                   </Button>
@@ -144,7 +144,7 @@ const Index = () => {
             <div className="text-center py-8 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No recent activity to show</p>
-              <Button variant="outline" className="mt-4" onClick={() => navigate('/workout/new')}>
+              <Button variant="outline" className="mt-4" onClick={() => navigate('/dashboard/workout/new')}>
                 Start First Workout
               </Button>
             </div>

@@ -14,6 +14,8 @@ import AppSidebar from "@/components/layout/AppSidebar";
 import CoverArea from "@/components/layout/CoverArea";
 import DynamicSidebarTrigger from "@/components/layout/DynamicSidebarTrigger";
 import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
+import PublicHome from "./pages/PublicHome";
 import Schedule from "./pages/Schedule";
 import Exercises from "./pages/Exercises";
 import Goals from "./pages/Goals";
@@ -47,6 +49,7 @@ const App = () => (
               <BrowserRouter>
                 <Routes>
                   {/* Public routes */}
+                  <Route path="/" element={<PublicHome />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -54,7 +57,7 @@ const App = () => (
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   
                   {/* Main app routes - using real auth but fallback to dev mode if no user */}
-                  <Route path="/*" element={
+                  <Route path="/dashboard/*" element={
                     <ProtectedRoute allowDevMode={true}>
                       <SidebarProvider>
                         <div className="flex min-h-screen w-full bg-background">
@@ -66,20 +69,20 @@ const App = () => (
                             <CoverArea />
                             <main className="flex-1 bg-white dark:bg-gray-900">
                               <div className="max-w-5xl mx-auto px-8 py-6">
-                                <Routes>
-                                  <Route path="/" element={<Index />} />
-                                  <Route path="/schedule" element={<Schedule />} />
-                                  <Route path="/exercises" element={<Exercises />} />
-                                  <Route path="/goals" element={<Goals />} />
-                                  <Route path="/progress" element={<Progress />} />
-                                  <Route path="/workout/:id" element={<WorkoutSession />} />
-                                  <Route path="/workout/new" element={<WorkoutSession />} />
-                                  <Route path="/workout/quick" element={<WorkoutSession />} />
-                                  <Route path="/goals/new" element={<Goals />} />
-                                  <Route path="/settings" element={<Settings />} />
-                                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                                  <Route path="*" element={<NotFound />} />
-                                </Routes>
+                                 <Routes>
+                                   <Route path="/" element={<Index />} />
+                                   <Route path="/schedule" element={<Schedule />} />
+                                   <Route path="/exercises" element={<Exercises />} />
+                                   <Route path="/goals" element={<Goals />} />
+                                   <Route path="/progress" element={<Progress />} />
+                                   <Route path="/workout/:id" element={<WorkoutSession />} />
+                                   <Route path="/workout/new" element={<WorkoutSession />} />
+                                   <Route path="/workout/quick" element={<WorkoutSession />} />
+                                   <Route path="/goals/new" element={<Goals />} />
+                                   <Route path="/settings" element={<Settings />} />
+                                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                                   <Route path="*" element={<NotFound />} />
+                                 </Routes>
                               </div>
                             </main>
                           </div>
