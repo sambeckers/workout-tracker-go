@@ -68,7 +68,7 @@ const LandingPage = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <Flame className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-foreground">FitTracker</span>
+              <span className="text-xl font-bold text-foreground">Go // Workout Tracker</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={() => navigate('/login')}>
@@ -111,12 +111,12 @@ const LandingPage = () => {
                 className="bg-white text-primary hover:bg-white/90 font-semibold px-8 py-4 text-lg"
                 onClick={() => navigate('/register')}
               >
-                Start Free Trial
+                Get Started
               </Button>
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="border-white text-white hover:bg-white/10 font-semibold px-8 py-4 text-lg"
+                className="border-white text-white bg-transparent hover:bg-white/10 font-semibold px-8 py-4 text-lg"
                 onClick={() => navigate('/login')}
               >
                 Sign In
@@ -163,7 +163,7 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-6">
-                Why Choose FitTracker?
+                Why Choose Go // Workout Tracker?
               </h2>
               <p className="text-lg text-muted-foreground mb-8">
                 Join the fitness revolution with our cutting-edge platform designed 
@@ -232,7 +232,7 @@ const LandingPage = () => {
           </h2>
           <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
             Join thousands of users who have already transformed their lives. 
-            Start your free trial today and see the difference.
+            Get started today and see the difference.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
@@ -240,12 +240,12 @@ const LandingPage = () => {
               className="bg-white text-primary hover:bg-white/90 font-semibold px-8 py-4 text-lg"
               onClick={() => navigate('/register')}
             >
-              Start Your Free Trial
+              Get Started Now
             </Button>
             <Button 
               size="lg" 
               variant="outline" 
-              className="border-white text-white hover:bg-white/10 font-semibold px-8 py-4 text-lg"
+              className="border-white text-white bg-transparent hover:bg-white/10 font-semibold px-8 py-4 text-lg"
               onClick={() => navigate('/login')}
             >
               Already Have Account?
@@ -260,10 +260,10 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Flame className="h-6 w-6 text-primary" />
-              <span className="text-lg font-bold">FitTracker</span>
+              <span className="text-lg font-bold">Go // Workout Tracker</span>
             </div>
             <div className="text-sm text-background/70">
-              © 2024 FitTracker. Transform your fitness journey.
+              © 2024 Go // Workout Tracker. Transform your fitness journey.
             </div>
           </div>
         </div>
