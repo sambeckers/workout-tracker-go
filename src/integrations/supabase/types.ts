@@ -14,6 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
+      exercise_logs: {
+        Row: {
+          created_at: string
+          distance_km: number | null
+          duration_seconds: number | null
+          exercise_id: string
+          log_id: string
+          notes: string | null
+          reps_per_set: string | null
+          session_id: string
+          sets: number | null
+          updated_at: string
+          weight_per_set: string | null
+        }
+        Insert: {
+          created_at?: string
+          distance_km?: number | null
+          duration_seconds?: number | null
+          exercise_id: string
+          log_id?: string
+          notes?: string | null
+          reps_per_set?: string | null
+          session_id: string
+          sets?: number | null
+          updated_at?: string
+          weight_per_set?: string | null
+        }
+        Update: {
+          created_at?: string
+          distance_km?: number | null
+          duration_seconds?: number | null
+          exercise_id?: string
+          log_id?: string
+          notes?: string | null
+          reps_per_set?: string | null
+          session_id?: string
+          sets?: number | null
+          updated_at?: string
+          weight_per_set?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_logs_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["exercise_id"]
+          },
+          {
+            foreignKeyName: "exercise_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          difficulty: string | null
+          equipment: string | null
+          exercise_id: string
+          media_url: string | null
+          muscle_group: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          equipment?: string | null
+          exercise_id?: string
+          media_url?: string | null
+          muscle_group?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          equipment?: string | null
+          exercise_id?: string
+          media_url?: string | null
+          muscle_group?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          category: string | null
+          created_at: string
+          current_value: string | null
+          deadline: string | null
+          description: string | null
+          goal_id: string
+          status: string | null
+          target_value: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          current_value?: string | null
+          deadline?: string | null
+          description?: string | null
+          goal_id?: string
+          status?: string | null
+          target_value?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          current_value?: string | null
+          deadline?: string | null
+          description?: string | null
+          goal_id?: string
+          status?: string | null
+          target_value?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -41,6 +179,78 @@ export type Database = {
           updated_at?: string
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      resources: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          resource_id: string
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id?: string
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          resource_id?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      workout_sessions: {
+        Row: {
+          created_at: string
+          date: string
+          duration_minutes: number | null
+          notes: string | null
+          session_id: string
+          status: string | null
+          time: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          duration_minutes?: number | null
+          notes?: string | null
+          session_id?: string
+          status?: string | null
+          time?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          duration_minutes?: number | null
+          notes?: string | null
+          session_id?: string
+          status?: string | null
+          time?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

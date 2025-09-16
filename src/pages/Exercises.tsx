@@ -1,121 +1,65 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Filter, Dumbbell, Heart, Zap, Target } from "lucide-react";
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Search, Filter, Dumbbell, Heart, Zap, Target, Users, Plus } from 'lucide-react';
+import { useExercises } from '@/hooks/useWorkoutData';
 
 const Exercises = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-
-  // Mock exercise data
-  const exercises = [
-    {
-      id: 1,
-      name: "Bench Press",
-      category: "chest",
-      equipment: "Barbell",
-      difficulty: "Intermediate",
-      muscleGroups: ["Chest", "Triceps", "Shoulders"],
-      description: "Classic upper body compound movement for building chest strength.",
-    },
-    {
-      id: 2,
-      name: "Squats",
-      category: "legs",
-      equipment: "Barbell",
-      difficulty: "Beginner",
-      muscleGroups: ["Quadriceps", "Glutes", "Hamstrings"],
-      description: "Fundamental lower body exercise for building leg and glute strength.",
-    },
-    {
-      id: 3,
-      name: "Deadlifts",
-      category: "back",
-      equipment: "Barbell",
-      difficulty: "Advanced",
-      muscleGroups: ["Back", "Hamstrings", "Glutes", "Core"],
-      description: "King of compound movements, targets multiple muscle groups.",
-    },
-    {
-      id: 4,
-      name: "Push Ups",
-      category: "chest",
-      equipment: "Bodyweight",
-      difficulty: "Beginner",
-      muscleGroups: ["Chest", "Triceps", "Core"],
-      description: "Classic bodyweight exercise for upper body strength.",
-    },
-    {
-      id: 5,
-      name: "Mountain Climbers",
-      category: "cardio",
-      equipment: "Bodyweight",
-      difficulty: "Intermediate",
-      muscleGroups: ["Core", "Legs", "Shoulders"],
-      description: "High-intensity cardio exercise that builds endurance.",
-    },
-    {
-      id: 6,
-      name: "Plank",
-      category: "core",
-      equipment: "Bodyweight",
-      difficulty: "Beginner",
-      muscleGroups: ["Core", "Shoulders"],
-      description: "Isometric exercise for core stability and strength.",
-    },
-  ];
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const { data: exercises = [], isLoading } = useExercises();
 
   const categories = [
-    { id: "all", name: "All Exercises", icon: Dumbbell },
-    { id: "chest", name: "Chest", icon: Target },
-    { id: "back", name: "Back", icon: Target },
-    { id: "legs", name: "Legs", icon: Target },
-    { id: "shoulders", name: "Shoulders", icon: Target },
-    { id: "arms", name: "Arms", icon: Target },
-    { id: "core", name: "Core", icon: Target },
-    { id: "cardio", name: "Cardio", icon: Heart },
+    { id: 'All', name: 'All Exercises', icon: Target },
+    { id: 'Chest', name: 'Chest', icon: Dumbbell },
+    { id: 'Back', name: 'Back', icon: Dumbbell },
+    { id: 'Legs', name: 'Legs', icon: Dumbbell },
+    { id: 'Shoulders', name: 'Shoulders', icon: Dumbbell },
+    { id: 'Core', name: 'Core', icon: Target },
+    { id: 'Full Body', name: 'Full Body', icon: Users }
   ];
 
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case "beginner":
-        return "bg-success";
-      case "intermediate":
-        return "bg-warning";
-      case "advanced":
-        return "bg-destructive";
+    switch (difficulty) {
+      case 'Beginner':
+        return 'bg-green-100 text-green-800';
+      case 'Intermediate':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Advanced':
+        return 'bg-red-100 text-red-800';
       default:
-        return "bg-muted";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const filteredExercises = exercises.filter((exercise) => {
+  // Filter exercises based on search term and category
+  const filteredExercises = exercises.filter(exercise => {
     const matchesSearch = exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exercise.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || exercise.category === selectedCategory;
+                         (exercise.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || exercise.muscle_group === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Exercise Library</h1>
-          <p className="text-muted-foreground">Discover exercises for every muscle group</p>
+          <h1 className="text-3xl font-bold text-foreground">Exercise Library</h1>
+          <p className="text-muted-foreground mt-2">Discover and track exercises for every muscle group</p>
         </div>
-        <Button variant="hero" className="gap-2">
+        <Button className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Exercise
         </Button>
       </div>
 
       {/* Search and Filters */}
-      <Card className="bg-gradient-card shadow-lg border-0">
+      <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -125,7 +69,7 @@ const Exercises = () => {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Filters
             </Button>
@@ -135,84 +79,93 @@ const Exercises = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Categories Sidebar */}
-        <div>
-          <Card className="bg-gradient-card shadow-lg border-0">
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {categories.map((category) => (
+        <Card>
+          <CardHeader>
+            <CardTitle>Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {categories.map((category) => {
+                const IconComponent = category.icon;
+                return (
                   <Button
                     key={category.id}
                     variant={selectedCategory === category.id ? "default" : "ghost"}
                     className="w-full justify-start gap-2"
                     onClick={() => setSelectedCategory(category.id)}
                   >
-                    <category.icon className="h-4 w-4" />
+                    <IconComponent className="h-4 w-4" />
                     {category.name}
                   </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Exercise Grid */}
         <div className="lg:col-span-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredExercises.map((exercise) => (
-              <Card key={exercise.id} className="bg-gradient-card shadow-lg border-0 hover:shadow-xl transition-smooth">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{exercise.name}</CardTitle>
-                    <Badge className={getDifficultyColor(exercise.difficulty)}>
-                      {exercise.difficulty}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">{exercise.description}</p>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Equipment:</span>
-                      <Badge variant="outline" className="ml-2">{exercise.equipment}</Badge>
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading exercises...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredExercises.map((exercise) => (
+                <Card key={exercise.exercise_id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{exercise.name}</CardTitle>
+                      {exercise.difficulty && (
+                        <Badge className={getDifficultyColor(exercise.difficulty)}>
+                          {exercise.difficulty}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <CardDescription className="mb-4">
+                      {exercise.description || 'No description available'}
+                    </CardDescription>
+                    
+                    <div className="space-y-2 text-sm">
+                      {exercise.equipment && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Equipment:</span>
+                          <span className="text-muted-foreground">{exercise.equipment}</span>
+                        </div>
+                      )}
+                      {exercise.muscle_group && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Muscle Group:</span>
+                          <span className="text-muted-foreground">{exercise.muscle_group}</span>
+                        </div>
+                      )}
                     </div>
                     
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Muscle Groups:</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {exercise.muscleGroups.map((muscle) => (
-                          <Badge key={muscle} variant="secondary" className="text-xs">
-                            {muscle}
-                          </Badge>
-                        ))}
-                      </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button size="sm" className="flex-1">
+                        Add to Workout
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        View Details
+                      </Button>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-                  <div className="flex justify-between items-center mt-4">
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                    <Button variant="default" size="sm">
-                      Add to Workout
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {filteredExercises.length === 0 && (
-            <Card className="bg-gradient-card shadow-lg border-0">
-              <CardContent className="text-center py-12">
-                <Dumbbell className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">No exercises found</h3>
-                <p className="text-muted-foreground">Try adjusting your search or filters</p>
-              </CardContent>
-            </Card>
+          {/* Empty State */}
+          {!isLoading && filteredExercises.length === 0 && (
+            <div className="text-center py-12">
+              <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No exercises found</h3>
+              <p className="mt-2 text-muted-foreground">
+                Try adjusting your search or filter criteria.
+              </p>
+            </div>
           )}
         </div>
       </div>

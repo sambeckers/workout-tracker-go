@@ -1,163 +1,196 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Clock, Users, Play, Edit, Trash2 } from "lucide-react";
+import React, { useState } from 'react';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Clock, Users, Target, Play, Edit, Trash2, Plus, Download } from 'lucide-react';
+import { useWorkoutSessions, useCreateWorkoutSession, useUpdateWorkoutSession, useExportWorkoutData } from '@/hooks/useWorkoutData';
+import { format, parseISO } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Schedule = () => {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-
-  // Mock data - replace with actual data from your backend
-  const workouts = [
-    {
-      id: 1,
-      title: "Upper Body Strength",
-      date: "2024-01-15",
-      time: "9:00 AM",
-      duration: "60 min",
-      type: "Strength",
-      status: "scheduled",
-      participants: ["Sam Beckers"],
-    },
-    {
-      id: 2,
-      title: "Cardio HIIT",
-      date: "2024-01-15",
-      time: "6:00 PM", 
-      duration: "45 min",
-      type: "Cardio",
-      status: "scheduled",
-      participants: ["Ricardo Scholten", "Suzanne van Elten"],
-    },
-    {
-      id: 3,
-      title: "Leg Day",
-      date: "2024-01-16",
-      time: "10:00 AM",
-      duration: "75 min",
-      type: "Strength",
-      status: "completed",
-      participants: ["Sam Beckers"],
-    },
-  ];
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const { user } = useAuth();
+  const { data: workouts = [], isLoading } = useWorkoutSessions();
+  const createWorkoutMutation = useCreateWorkoutSession();
+  const updateWorkoutMutation = useUpdateWorkoutSession();
+  const exportDataMutation = useExportWorkoutData();
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed":
-        return "bg-success";
-      case "scheduled":
-        return "bg-primary";
-      case "missed":
-        return "bg-destructive";
+      case 'Done':
+        return 'bg-green-500';
+      case 'Planned':
+        return 'bg-blue-500';
+      case 'Skipped':
+        return 'bg-red-500';
       default:
-        return "bg-muted";
+        return 'bg-gray-500';
     }
   };
 
+  const handleCreateWorkout = () => {
+    createWorkoutMutation.mutate({
+      title: "New Workout",
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      time: "09:00",
+      status: "Planned",
+      duration_minutes: 60
+    });
+  };
+
+  const handleStartWorkout = (sessionId: string) => {
+    updateWorkoutMutation.mutate({
+      sessionId,
+      data: { status: 'Done' }
+    });
+  };
+
+  const filteredWorkouts = workouts.filter(workout => 
+    format(parseISO(workout.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+  );
+
+  if (!user) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-center text-muted-foreground">Please log in to view your workout schedule.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Workout Schedule</h1>
-          <p className="text-muted-foreground">Plan and track your training sessions</p>
+          <h1 className="text-3xl font-bold text-foreground">Workout Schedule</h1>
+          <p className="text-muted-foreground mt-2">Plan and track your fitness routine</p>
         </div>
-        <Button variant="hero" className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Workout
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => exportDataMutation.mutate()}
+            variant="outline"
+            className="flex items-center gap-2"
+            disabled={exportDataMutation.isPending}
+          >
+            <Download className="h-4 w-4" />
+            Export Data
+          </Button>
+          <Button 
+            onClick={handleCreateWorkout}
+            className="flex items-center gap-2"
+            disabled={createWorkoutMutation.isPending}
+          >
+            <Plus className="h-4 w-4" />
+            Add Workout
+          </Button>
+        </div>
       </div>
 
-      {/* Calendar & Schedule Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Mini Calendar */}
-        <Card className="bg-gradient-card shadow-lg border-0">
+      {/* Calendar and Workouts */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Calendar */}
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
+              <CalendarDays className="h-5 w-5" />
               Calendar
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
-                {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </div>
-              <div className="text-4xl font-bold mt-2">
-                {selectedDate.getDate()}
-              </div>
-              <div className="text-muted-foreground">
-                {selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}
-              </div>
-            </div>
-            {/* Simple calendar grid would go here in a real implementation */}
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => date && setSelectedDate(date)}
+              className="rounded-md border"
+            />
           </CardContent>
         </Card>
 
-        {/* Workout List */}
-        <div className="lg:col-span-2">
-          <Card className="bg-gradient-card shadow-lg border-0">
-            <CardHeader>
-              <CardTitle>Upcoming Workouts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {workouts.map((workout) => (
-                  <div
-                    key={workout.id}
-                    className="p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-smooth"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{workout.title}</h3>
-                          <Badge className={getStatusColor(workout.status)}>
-                            {workout.status}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {new Date(workout.date).toLocaleDateString()}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {workout.time}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            {workout.participants.length} participant{workout.participants.length > 1 ? 's' : ''}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{workout.type}</Badge>
-                          <span className="text-sm text-muted-foreground">{workout.duration}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {workout.status === "scheduled" && (
-                          <Button variant="success" size="sm" className="gap-1">
-                            <Play className="h-3 w-3" />
-                            Start
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+      {/* Workouts List */}
+      <div className="lg:col-span-3 space-y-4">
+        <h2 className="text-xl font-semibold text-foreground">
+          Workouts for {selectedDate.toLocaleDateString()}
+        </h2>
+        
+        {isLoading ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">Loading workouts...</p>
+          </Card>
+        ) : filteredWorkouts.length > 0 ? (
+          filteredWorkouts.map((workout) => (
+            <Card key={workout.session_id} className="p-6">
+              <div className="flex justify-between items-start">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-foreground">{workout.title || 'Untitled Workout'}</h3>
+                    <Badge className={getStatusColor(workout.status)}>
+                      {workout.status}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      {workout.time || 'No time set'} • {workout.duration_minutes || 0} mins
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      {format(parseISO(workout.date), 'MMM dd, yyyy')}
                     </div>
                   </div>
-                ))}
+                  
+                  {workout.notes && (
+                    <p className="text-sm text-muted-foreground">{workout.notes}</p>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {workout.status === 'Planned' && (
+                    <Button 
+                      size="sm" 
+                      className="flex items-center gap-2"
+                      onClick={() => handleStartWorkout(workout.session_id)}
+                      disabled={updateWorkoutMutation.isPending}
+                    >
+                      <Play className="h-4 w-4" />
+                      Start
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" className="flex items-center gap-2">
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex items-center gap-2 text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                </div>
               </div>
-            </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card className="p-8 text-center">
+            <CalendarDays className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No workouts scheduled</h3>
+            <p className="text-muted-foreground mb-4">
+              You haven't scheduled any workouts for this date yet.
+            </p>
+            <Button 
+              className="flex items-center gap-2 mx-auto"
+              onClick={handleCreateWorkout}
+              disabled={createWorkoutMutation.isPending}
+            >
+              <Plus className="h-4 w-4" />
+              Schedule Workout
+            </Button>
           </Card>
-        </div>
+        )}
+      </div>
       </div>
     </div>
   );
