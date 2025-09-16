@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Dumbbell, Mail, ArrowLeft } from "lucide-react";
+import { Flame, Mail, ArrowLeft } from "lucide-react";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -63,9 +63,9 @@ const ForgotPassword = () => {
           {/* Logo */}
           <div className="flex flex-col items-center space-y-2">
             <div className="p-3 bg-gradient-primary rounded-xl">
-              <Dumbbell className="h-8 w-8 text-white" />
+                <Flame className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold">FitTracker</h1>
+              <h1 className="text-2xl font-bold">Go // Workout Tracker</h1>
           </div>
 
           <Card>
@@ -112,9 +112,9 @@ const ForgotPassword = () => {
         {/* Logo */}
         <div className="flex flex-col items-center space-y-2">
           <div className="p-3 bg-gradient-primary rounded-xl">
-            <Dumbbell className="h-8 w-8 text-white" />
+              <Flame className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold">FitTracker</h1>
+            <h1 className="text-2xl font-bold">Go // Workout Tracker</h1>
           <p className="text-muted-foreground text-center">
             Enter your email to receive a password reset link.
           </p>

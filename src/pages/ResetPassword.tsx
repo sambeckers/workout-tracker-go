@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Dumbbell, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Flame, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const ResetPassword = () => {
@@ -134,9 +134,9 @@ const ResetPassword = () => {
         {/* Logo */}
         <div className="flex flex-col items-center space-y-2">
           <div className="p-3 bg-gradient-primary rounded-xl">
-            <Dumbbell className="h-8 w-8 text-white" />
+            <Flame className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold">FitTracker</h1>
+          <h1 className="text-2xl font-bold">Go // Workout Tracker</h1>
           <p className="text-muted-foreground text-center">
             Create a new password for your account.
           </p>

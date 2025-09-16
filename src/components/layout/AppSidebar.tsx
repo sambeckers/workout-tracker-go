@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Target, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, ChevronRight, Code, UserCheck, Shield } from "lucide-react";
+import { Calendar, Target, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, ChevronRight, Code, UserCheck, Shield, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -105,9 +105,9 @@ const AppSidebar = () => {
             className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
           >
             <div className="p-1.5 bg-gradient-primary rounded-md">
-              <Dumbbell className="h-4 w-4 text-white" />
+              <Flame className="h-4 w-4 text-white" />
             </div>
-            {open && <span className="font-semibold text-sidebar-primary">Workout Tracker</span>}
+            {open && <span className="font-semibold text-sidebar-primary">Go // Workout Tracker</span>}
           </button>
         </div>
 

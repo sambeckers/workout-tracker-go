@@ -40,7 +40,7 @@ const AuthCallback = () => {
 
           toast({
             title: "Email Confirmed!",
-            description: "Your email has been successfully confirmed. Welcome to FitTracker!",
+            description: "Your email has been successfully confirmed. Welcome to Go // Workout Tracker!",
           });
           navigate("/");
         } else {

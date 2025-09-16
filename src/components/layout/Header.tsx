@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, User, Settings, Calendar, Target, TrendingUp, Book } from "lucide-react";
+import { Flame, User, Settings, Calendar, Target, TrendingUp, Book } from "lucide-react";
 
 const Header = () => {
   const location = useLocation();
@@ -18,10 +18,10 @@ const Header = () => {
         <nav className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
             <div className="p-2 bg-gradient-primary rounded-lg shadow-md group-hover:shadow-glow transition-smooth">
-              <Dumbbell className="h-6 w-6 text-white" />
+              <Flame className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-              FitTracker
+              Go // Workout Tracker
             </span>
           </Link>
 

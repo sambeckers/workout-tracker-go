@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Dumbbell, Eye, EyeOff, Mail, Lock, User as UserIcon } from "lucide-react";
+import { Flame, Eye, EyeOff, Mail, Lock, User as UserIcon } from "lucide-react";
 
 const Login = () => {
   const [emailOrUsername, setEmailOrUsername] = useState("");
@@ -133,9 +133,9 @@ const Login = () => {
         {/* Logo */}
         <div className="flex flex-col items-center space-y-2">
           <div className="p-3 bg-gradient-primary rounded-xl">
-            <Dumbbell className="h-8 w-8 text-white" />
+            <Flame className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold">FitTracker</h1>
+          <h1 className="text-2xl font-bold">Go // Workout Tracker</h1>
           <p className="text-muted-foreground text-center">
             Welcome back! Sign in to continue your fitness journey.
           </p>

@@ -1,64 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Dumbbell, 
-  Target, 
-  TrendingUp, 
-  Calendar, 
-  Trophy, 
-  Flame,
-  CheckCircle,
-  Users,
-  Clock,
-  BarChart3
-} from "lucide-react";
+import { Flame, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-fitness.jpg";
+import { features, benefits, stats, heroBadgeText, heroHeadline } from "./landing/content";
 
 const LandingPage = () => {
   const navigate = useNavigate();
 
-  const features = [
-    {
-      icon: Calendar,
-      title: "Smart Scheduling",
-      description: "Plan your workouts with our intelligent scheduling system that adapts to your lifestyle."
-    },
-    {
-      icon: Dumbbell,
-      title: "Exercise Library",
-      description: "Access thousands of exercises with detailed instructions and video demonstrations."
-    },
-    {
-      icon: Target,
-      title: "Goal Tracking",
-      description: "Set and achieve your fitness goals with our comprehensive tracking system."
-    },
-    {
-      icon: TrendingUp,
-      title: "Progress Analytics",
-      description: "Monitor your progress with detailed analytics and performance insights."
-    },
-    {
-      icon: Trophy,
-      title: "Achievement System",
-      description: "Stay motivated with our gamified achievement system and milestone rewards."
-    },
-    {
-      icon: Users,
-      title: "Community",
-      description: "Connect with like-minded fitness enthusiasts and share your journey."
-    }
-  ];
-
-  const benefits = [
-    "Track your workouts and progress",
-    "Personalized exercise recommendations",
-    "Goal setting and achievement tracking",
-    "Performance analytics and insights",
-    "Community support and motivation"
-  ];
+  
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,33 +33,31 @@ const LandingPage = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - matches dashboard cover style */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-hero opacity-90"></div>
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ 
-            backgroundImage: `url(${heroImage})`,
-            backgroundBlendMode: 'multiply'
+          style={{
+            backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url(${heroImage})`,
           }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="text-center">
             <Badge variant="secondary" className="mb-6 bg-white/20 text-white border-white/30">
-              🔥 Your Fitness Journey Starts Here
+              {heroBadgeText}
             </Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Transform Your Body,
-              <span className="block text-white/90">Elevate Your Life</span>
+            <h1 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}>
+              {heroHeadline}
             </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.6)' }}>
               Join thousands of fitness enthusiasts who are achieving their goals with our comprehensive 
               workout tracking, smart scheduling, and progress analytics platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 size="lg" 
-                className="bg-white text-primary hover:bg-white/90 font-semibold px-8 py-4 text-lg"
+                variant="hero"
+                className="font-semibold px-8 py-4 text-lg"
                 onClick={() => navigate('/register')}
               >
                 Get Started
@@ -188,34 +137,15 @@ const LandingPage = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-gradient-primary text-white border-0">
-                <CardContent className="p-6 text-center">
-                  <BarChart3 className="h-8 w-8 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">50K+</div>
-                  <div className="text-white/80">Active Users</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-secondary text-white border-0">
-                <CardContent className="p-6 text-center">
-                  <Trophy className="h-8 w-8 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">1M+</div>
-                  <div className="text-white/80">Workouts Completed</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-accent text-white border-0">
-                <CardContent className="p-6 text-center">
-                  <Target className="h-8 w-8 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">95%</div>
-                  <div className="text-white/80">Goal Achievement</div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-card border-0">
-                <CardContent className="p-6 text-center">
-                  <Clock className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold text-foreground">24/7</div>
-                  <div className="text-muted-foreground">Support</div>
-                </CardContent>
-              </Card>
+              {stats.map((s, i) => (
+                <Card key={i} className={`${s.variant === 'card' ? 'bg-gradient-card' : 'text-white border-0'} ${s.variant === 'primary' ? 'bg-gradient-primary' : s.variant === 'secondary' ? 'bg-gradient-secondary' : s.variant === 'accent' ? 'bg-gradient-accent' : ''}`}>
+                  <CardContent className="p-6 text-center">
+                    <s.icon className={`h-8 w-8 mx-auto mb-2 ${s.variant === 'card' ? 'text-primary' : ''}`} />
+                    <div className={`text-2xl font-bold ${s.variant === 'card' ? 'text-foreground' : ''}`}>{s.value}</div>
+                    <div className={`${s.variant === 'card' ? 'text-muted-foreground' : 'text-white/80'}`}>{s.label}</div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         </div>
