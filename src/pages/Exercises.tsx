@@ -3,13 +3,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Search, Filter, Dumbbell, Heart, Zap, Target, Users, Plus } from 'lucide-react';
 import { useExercises } from '@/hooks/useWorkoutData';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const Exercises = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const { data: exercises = [], isLoading } = useExercises();
+  const [createOpen, setCreateOpen] = useState(false);
+  const navigate = useNavigate();
+  const [form, setForm] = useState({
+    name: '',
+    muscle_group: '',
+    description: '',
+    equipment: '',
+    difficulty: 'Beginner'
+  });
 
   const categories = [
     { id: 'All', name: 'All Exercises', icon: Target },
@@ -42,18 +56,81 @@ const Exercises = () => {
     return matchesSearch && matchesCategory;
   });
 
+  const handleCreate = async () => {
+    if (!form.name) return;
+    const { error } = await supabase.from('exercises').insert({
+      name: form.name,
+      muscle_group: form.muscle_group || null,
+      description: form.description || null,
+      equipment: form.equipment || null,
+      difficulty: form.difficulty || null
+    });
+    if (error) {
+      toast.error('Failed to create exercise');
+    } else {
+      toast.success('Exercise created');
+      setCreateOpen(false);
+      setForm({ name: '', muscle_group: '', description: '', equipment: '', difficulty: 'Beginner' });
+    }
+  };
+
+  const addToWorkout = (exerciseId: string) => {
+    navigate(`/dashboard/workout/new?exerciseId=${exerciseId}`);
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+  <div className="app-container p-8 space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Exercise Library</h1>
           <p className="text-muted-foreground mt-2">Discover and track exercises for every muscle group</p>
         </div>
-        <Button className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Exercise
-        </Button>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Exercise
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Create Exercise</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="grid gap-2">
+                <Label htmlFor="ex-name">Name</Label>
+                <Input id="ex-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ex-muscle">Muscle Group</Label>
+                <Input id="ex-muscle" value={form.muscle_group} onChange={e => setForm(f => ({ ...f, muscle_group: e.target.value }))} placeholder="Chest, Back..." />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ex-desc">Description</Label>
+                <Input id="ex-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="ex-equip">Equipment</Label>
+                  <Input id="ex-equip" value={form.equipment} onChange={e => setForm(f => ({ ...f, equipment: e.target.value }))} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ex-diff">Difficulty</Label>
+                  <select id="ex-diff" className="border rounded-md h-9 px-2 bg-background" value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}>
+                    <option>Beginner</option>
+                    <option>Intermediate</option>
+                    <option>Advanced</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button disabled={!form.name} onClick={handleCreate}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Search and Filters */}
@@ -144,7 +221,7 @@ const Exercises = () => {
                     </div>
                     
                     <div className="mt-4 flex gap-2">
-                      <Button size="sm" className="flex-1">
+                      <Button size="sm" className="flex-1" onClick={() => addToWorkout(exercise.exercise_id)}>
                         Add to Workout
                       </Button>
                       <Button size="sm" variant="outline">

@@ -6,17 +6,22 @@ import { Progress as ProgressBar } from '@/components/ui/progress';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { TrendingUp, Calendar, Clock, Target, Dumbbell, Download, FileText } from 'lucide-react';
 import { useProgressData, useExportWorkoutData } from '@/hooks/useWorkoutData';
+import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
+import { convertKgToUnit, formatWeightList, convertTotalVolume } from '@/lib/units';
+import { useNavigate } from 'react-router-dom';
 import { format, parseISO, subMonths, isAfter } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Progress = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: progressData, isLoading } = useProgressData();
+  const { unit } = useUnitPreference();
   const exportDataMutation = useExportWorkoutData();
 
   if (!user) {
     return (
-      <div className="container mx-auto p-6">
+  <div className="app-container p-8">
         <Card>
           <CardContent className="p-6">
             <p className="text-center text-muted-foreground">Please log in to view your progress.</p>
@@ -28,7 +33,7 @@ const Progress = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+  <div className="app-container p-8">
         <Card>
           <CardContent className="p-6">
             <p className="text-center text-muted-foreground">Loading your progress...</p>
@@ -43,7 +48,8 @@ const Progress = () => {
   // Calculate stats from real data
   const stats = {
     totalWorkouts: sessions.length,
-    totalWeight: logs.reduce((sum, log) => {
+    // Stored weights are in kg; treat the sum as kg volume
+    totalWeightKg: logs.reduce((sum, log) => {
       if (!log.weight_per_set || !log.sets) return sum;
       const weights = log.weight_per_set.split(',').map(w => parseFloat(w.trim()) || 0);
       return sum + weights.reduce((a, b) => a + b, 0) * (log.sets || 1);
@@ -66,7 +72,7 @@ const Progress = () => {
     const monthLogs = logs.filter(log => 
       monthSessions.some(s => s.session_id === log.session_id)
     );
-    const monthWeight = monthLogs.reduce((sum, log) => {
+    const monthWeightKg = monthLogs.reduce((sum, log) => {
       if (!log.weight_per_set || !log.sets) return sum;
       const weights = log.weight_per_set.split(',').map(w => parseFloat(w.trim()) || 0);
       return sum + weights.reduce((a, b) => a + b, 0) * (log.sets || 1);
@@ -75,14 +81,14 @@ const Progress = () => {
     monthlyProgress.push({
       month: format(date, 'MMM'),
       workouts: monthSessions.length,
-      weight: Math.round(monthWeight)
+      weight: convertTotalVolume(monthWeightKg, unit)
     });
   }
 
   // Get recent workouts (last 5)
   const recentWorkouts = sessions.slice(0, 5).map(session => {
     const sessionLogs = logs.filter(log => log.session_id === session.session_id);
-    const totalWeight = sessionLogs.reduce((sum, log) => {
+    const totalWeightKg = sessionLogs.reduce((sum, log) => {
       if (!log.weight_per_set || !log.sets) return sum;
       const weights = log.weight_per_set.split(',').map(w => parseFloat(w.trim()) || 0);
       return sum + weights.reduce((a, b) => a + b, 0) * (log.sets || 1);
@@ -94,12 +100,12 @@ const Progress = () => {
       title: session.title || 'Workout',
       duration: session.duration_minutes || 0,
       exercises: sessionLogs.length,
-      totalWeight: Math.round(totalWeight)
+      totalWeightKg: Math.round(totalWeightKg)
     };
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+  <div className="app-container p-8 space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -142,8 +148,8 @@ const Progress = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Weight Lifted</p>
-                <p className="text-2xl font-bold">{Math.round(stats.totalWeight).toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">lbs total</p>
+                <p className="text-2xl font-bold">{convertTotalVolume(stats.totalWeightKg, unit).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">{unit} total</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -224,7 +230,7 @@ const Progress = () => {
                     <div>
                       <div className="font-medium">{log.exercise?.name || 'Unknown Exercise'}</div>
                       <div className="text-sm text-muted-foreground">
-                        {log.sets} sets • {log.reps_per_set} reps • {log.weight_per_set} lbs
+                        {log.sets} sets • {log.reps_per_set} reps • {formatWeightList(log.weight_per_set, unit)} {unit}
                       </div>
                     </div>
                   </div>
@@ -260,7 +266,7 @@ const Progress = () => {
           <div className="space-y-3">
             <div className="space-y-4">
               {recentWorkouts.length > 0 ? recentWorkouts.map((workout) => (
-                <div key={workout.id} className="flex justify-between items-center p-4 border rounded-lg">
+                <div key={workout.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/workout/${workout.id}`)}>
                   <div>
                     <div className="font-medium">{workout.title}</div>
                     <div className="text-sm text-muted-foreground flex items-center gap-4">
@@ -276,7 +282,7 @@ const Progress = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium">{workout.totalWeight.toLocaleString()} lbs</div>
+                    <div className="font-medium">{convertTotalVolume(workout.totalWeightKg, unit).toLocaleString()} {unit}</div>
                     <div className="text-sm text-muted-foreground">Total Volume</div>
                   </div>
                 </div>

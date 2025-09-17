@@ -11,7 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Moon, Sun, Bell, Shield, Palette, Save, Upload, LogOut, Type, Eye, EyeOff, Lock, Download } from "lucide-react";
+import { User, Moon, Sun, Bell, Shield, Palette, Save, Upload, LogOut, Type, Eye, EyeOff, Lock, Download, Weight } from "lucide-react";
+import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -39,6 +40,7 @@ const Settings = () => {
     confirm: false
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const { unit, toggleUnit, setUnit } = useUnitPreference();
 
   // Mock user for development
   const mockUser = {
@@ -334,6 +336,29 @@ const Settings = () => {
             <Save className="h-4 w-4 mr-2" />
             {loading ? "Saving..." : "Save Profile"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Unit Preference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Weight className="h-5 w-5" />
+            Measurement Units
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Preferred Weight Unit</p>
+              <p className="text-sm text-muted-foreground">Applies across planning and session tracking</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${unit === 'kg' ? 'font-semibold' : 'text-muted-foreground'}`}>kg</span>
+              <Switch checked={unit === 'lbs'} onCheckedChange={toggleUnit} />
+              <span className={`text-xs ${unit === 'lbs' ? 'font-semibold' : 'text-muted-foreground'}`}>lbs</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

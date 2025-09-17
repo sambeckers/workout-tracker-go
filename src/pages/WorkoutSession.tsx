@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Play, Pause, Check, Timer, Dumbbell, Save } from "lucide-react";
-import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog } from "@/hooks/useWorkoutData";
+import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession } from "@/hooks/useWorkoutData";
 import { toast } from "sonner";
 
 interface Set {
@@ -19,6 +20,8 @@ interface ExerciseWithSets {
   id: string;
   name: string;
   sets: Set[];
+  targetWeight?: number;
+  targetDurationPerSet?: number;
 }
 
 const WorkoutSession = () => {
@@ -27,13 +30,44 @@ const WorkoutSession = () => {
   const [isActive, setIsActive] = useState(false);
   const [duration, setDuration] = useState(0);
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
+  const { unit } = useUnitPreference();
+  const useLbs = unit === 'lbs';
 
   const { data: workoutSessions = [] } = useWorkoutSessions();
   const { data: availableExercises = [] } = useExercises();
   const { data: exerciseLogs = [] } = useExerciseLogs(id !== "new" ? id : undefined);
   const createExerciseLogMutation = useCreateExerciseLog();
+  const createSessionMutation = useCreateWorkoutSession();
 
   const currentWorkout = workoutSessions.find(w => w.session_id === id);
+
+  // Auto-create a real session if we're on the /new route
+  useEffect(() => {
+    const createSession = async () => {
+      if ((id === 'new' || id === 'quick') && !createSessionMutation.isPending) {
+        try {
+          const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const date = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          const result: any = await createSessionMutation.mutateAsync({
+            title: id === 'quick' ? 'Quick Session' : 'New Workout',
+            date,
+            time,
+            status: id === 'quick' ? 'Planned' : 'Planned',
+            duration_minutes: 0
+          });
+          if (result && result.session_id) {
+            navigate(`/dashboard/workout/${result.session_id}`, { replace: true });
+          }
+        } catch (e) {
+          toast.error('Failed to create workout session');
+        }
+      }
+    };
+    createSession();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // Initialize exercises with sets when data loads
   useEffect(() => {
@@ -50,24 +84,50 @@ const WorkoutSession = () => {
         }
         
         // Create sets from exercise log data
-        if (log.sets && log.reps_per_set && log.weight_per_set) {
-          const reps = log.reps_per_set.split(',').map(r => parseInt(r.trim()));
-          const weights = log.weight_per_set.split(',').map(w => parseInt(w.trim()));
-          
+        if (log.sets) {
+          const reps = log.reps_per_set ? log.reps_per_set.split(',').map(r => parseInt(r.trim())) : [];
+          const weights = log.weight_per_set ? log.weight_per_set.split(',').map(w => parseInt(w.trim())) : [];
+          const durationPerSet = log.duration_seconds && log.sets ? Math.round(log.duration_seconds / log.sets) : undefined;
           for (let i = 0; i < log.sets; i++) {
             acc[exerciseId].sets.push({
               setNumber: i + 1,
               reps: reps[i] || 0,
               weight: weights[i] || 0,
-              completed: true // Assume logged sets are completed
+              completed: false
             });
           }
+          acc[exerciseId].targetWeight = weights[0];
+          acc[exerciseId].targetDurationPerSet = durationPerSet;
         }
         
         return acc;
       }, {} as Record<string, ExerciseWithSets>);
 
       setExercises(Object.values(exerciseGroups));
+    } else if (id && id !== "new" && id !== "quick") {
+      // Check for pre-planned exercises from WorkoutPlanner
+      const plannedKey = `planned-exercises-${id}`;
+      const plannedExercises = localStorage.getItem(plannedKey);
+      
+      if (plannedExercises) {
+        try {
+          const parsed = JSON.parse(plannedExercises);
+          const exerciseList = parsed.map((ex: any) => ({
+            id: ex.exercise_id,
+            name: ex.name,
+            sets: Array.from({ length: ex.target_sets }, (_, i) => ({
+              setNumber: i + 1,
+              reps: 0,
+              weight: 0,
+              completed: false
+            }))
+          }));
+          setExercises(exerciseList);
+          localStorage.removeItem(plannedKey); // Clean up
+        } catch (e) {
+          console.error('Failed to parse planned exercises:', e);
+        }
+      }
     } else if (id === "new") {
       // Initialize with a default exercise for new workouts
       setExercises([{
@@ -162,7 +222,7 @@ const WorkoutSession = () => {
   const workoutTitle = currentWorkout?.title || (id === "new" ? "New Workout" : "Workout Session");
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+  <div className="app-container p-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -252,6 +312,8 @@ const WorkoutSession = () => {
         </Card>
       </div>
 
+      {/* Unit toggle removed (global setting in Settings page) */}
+
       {/* Exercise List */}
       <div className="space-y-6">
         {exercises.map((exercise) => (
@@ -294,28 +356,39 @@ const WorkoutSession = () => {
                       <label className="text-sm font-medium w-16">Weight:</label>
                       <Input
                         type="number"
-                        value={set.weight}
-                        onChange={(e) => updateSet(exercise.id, index, 'weight', parseInt(e.target.value) || 0)}
-                        className="w-20 h-9"
+                        value={useLbs ? Math.round(set.weight * 2.20462) : set.weight}
+                        onChange={(e) => {
+                          const raw = parseInt(e.target.value) || 0;
+                          const kg = useLbs ? Math.round(raw / 2.20462) : raw;
+                          updateSet(exercise.id, index, 'weight', kg);
+                        }}
+                        className="w-24 h-9"
                         disabled={set.completed}
                       />
-                      <span className="text-sm text-muted-foreground">lbs</span>
+                      <span className="text-sm text-muted-foreground">{useLbs ? 'lbs' : 'kg'}</span>
                     </div>
+                    {exercise.targetDurationPerSet !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium w-20">Time (s):</label>
+                        <Input
+                          type="number"
+                          value={exercise.targetDurationPerSet}
+                          onChange={(e) => {/* optional per-set override ignored for now */}}
+                          className="w-24 h-9"
+                          disabled
+                        />
+                      </div>
+                    )}
 
                     <Button
                       variant={set.completed ? "default" : "outline"}
                       size="sm"
                       onClick={() => toggleSet(exercise.id, index)}
                       className="ml-auto"
+                      title={set.completed ? "Click to undo" : "Mark as complete"}
                     >
-                      {set.completed ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          Done
-                        </>
-                      ) : (
-                        "Complete"
-                      )}
+                      <Check className={`h-4 w-4 mr-2 ${set.completed ? 'text-white' : ''}`} />
+                      {set.completed ? "Done" : "Complete"}
                     </Button>
                   </div>
                 ))}
@@ -327,10 +400,18 @@ const WorkoutSession = () => {
         {/* Add Exercise Button */}
         <Card className="border-dashed hover:shadow-lg transition-shadow cursor-pointer">
           <CardContent className="p-8 text-center">
-            <Button variant="ghost" className="gap-2" size="lg">
+            <Button 
+              variant="ghost" 
+              className="gap-2" 
+              size="lg"
+              onClick={() => navigate('/dashboard/exercises')}
+            >
               <Plus className="h-5 w-5" />
               Add Exercise
             </Button>
+            <p className="text-sm text-muted-foreground mt-2">
+              Browse exercise library to add to this workout
+            </p>
           </CardContent>
         </Card>
       </div>

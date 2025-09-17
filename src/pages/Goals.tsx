@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Target, TrendingUp, Calendar, Plus, Edit, Trash2, Dumbbell, Heart, Activity, Zap, Smile, Download } from 'lucide-react';
 import { useGoals, useCreateGoal, useExportWorkoutData } from '@/hooks/useWorkoutData';
 import { format, parseISO } from 'date-fns';
@@ -43,15 +46,27 @@ const Goals = () => {
     return categoryItem ? categoryItem.icon : Target;
   };
 
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    category: 'Strength',
+    target_value: '',
+    current_value: '0',
+    deadline: ''
+  });
+
   const handleCreateGoal = () => {
+    if (!form.title) return;
     createGoalMutation.mutate({
-      title: "New Goal",
-      description: "Set your goal description",
-      category: "Strength",
-      status: "Active",
-      target_value: "100",
-      current_value: "0"
-    });
+      title: form.title,
+      description: form.description,
+      category: form.category as any,
+      status: 'Active',
+      target_value: form.target_value || undefined,
+      current_value: form.current_value || undefined,
+      deadline: form.deadline || undefined
+    }, { onSuccess: () => { setOpen(false); setForm({ title: '', description: '', category: 'Strength', target_value: '', current_value: '0', deadline: '' }); }});
   };
 
   // Filter goals by category
@@ -72,7 +87,7 @@ const Goals = () => {
 
   if (!user) {
     return (
-      <div className="container mx-auto p-6">
+  <div className="app-container p-8">
         <Card>
           <CardContent className="p-6">
             <p className="text-center text-muted-foreground">Please log in to view your goals.</p>
@@ -83,7 +98,7 @@ const Goals = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+  <div className="app-container p-8 space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -100,14 +115,55 @@ const Goals = () => {
             <Download className="h-4 w-4" />
             Export Data
           </Button>
-          <Button 
-            onClick={handleCreateGoal}
-            className="flex items-center gap-2"
-            disabled={createGoalMutation.isPending}
-          >
-            <Plus className="h-4 w-4" />
-            New Goal
-          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                New Goal
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Goal</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="g-title">Title</Label>
+                  <Input id="g-title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Increase Bench Press" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="g-desc">Description</Label>
+                  <Input id="g-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="g-category">Category</Label>
+                  <select id="g-category" className="border rounded-md h-9 px-2 bg-background" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                    {categories.filter(c => c.id !== 'All').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="g-target">Target</Label>
+                    <Input id="g-target" value={form.target_value} onChange={e => setForm(f => ({ ...f, target_value: e.target.value }))} placeholder="e.g. 100" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="g-current">Current</Label>
+                    <Input id="g-current" value={form.current_value} onChange={e => setForm(f => ({ ...f, current_value: e.target.value }))} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="g-deadline">Deadline</Label>
+                    <Input id="g-deadline" type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button disabled={createGoalMutation.isPending || !form.title} onClick={handleCreateGoal}>Create</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

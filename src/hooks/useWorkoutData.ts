@@ -191,6 +191,29 @@ export const useUpdateWorkoutSession = () => {
   });
 };
 
+export const useDeleteWorkoutSession = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await supabase
+        .from('workout_sessions')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
+      toast.success('Workout session deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete workout session');
+      console.error(error);
+    },
+  });
+};
+
 export const useCreateGoal = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -241,6 +264,28 @@ export const useCreateExerciseLog = () => {
       toast.error('Failed to save exercise log');
       console.error(error);
     },
+  });
+};
+
+export const useBulkCreateExerciseLogs = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (logs: Array<Omit<ExerciseLog, 'log_id' | 'created_at' | 'updated_at'>>) => {
+      if (!logs.length) return [];
+      const { data, error } = await supabase
+        .from('exercise_logs')
+        .insert(logs)
+        .select();
+      if (error) throw error;
+      return data as ExerciseLog[];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise-logs'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save planned exercises');
+      console.error(error);
+    }
   });
 };
 
