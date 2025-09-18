@@ -107,12 +107,12 @@ const Schedule = () => {
   return (
   <div className="app-container p-8 space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Workout Schedule</h1>
           <p className="text-muted-foreground mt-2">Plan and track your fitness routine</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
           <Button 
             onClick={() => exportDataMutation.mutate()}
             variant="outline"
@@ -177,7 +177,7 @@ const Schedule = () => {
         ) : dayWorkouts.length > 0 ? (
           dayWorkouts.map((workout) => (
             <Card key={workout.session_id} className="p-6">
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col md:flex-row md:justify-between items-start gap-4">
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-foreground">{workout.title || 'Untitled Workout'}</h3>
@@ -202,7 +202,7 @@ const Schedule = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap w-full md:w-auto md:justify-end">
                   <Button 
                     size="sm" 
                     variant="outline"
@@ -277,7 +277,7 @@ const Schedule = () => {
             <div className="space-y-4">
               {visibleUpcoming.map(w => (
                 <Card key={w.session_id} className="p-4">
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{w.title || 'Untitled Workout'}</span>
@@ -289,7 +289,7 @@ const Schedule = () => {
                         <span>{w.duration_minutes || 0} mins</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap w-full sm:w-auto sm:justify-end">
                       <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/workout/${w.session_id}`)} title="Open session">
                         <Dumbbell className="h-4 w-4" />
                       </Button>

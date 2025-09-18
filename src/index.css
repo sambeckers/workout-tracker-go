@@ -135,8 +135,9 @@
     max-width: var(--app-max-width);
     margin-left: auto;
     margin-right: auto;
-    padding-left: 2rem;
-    padding-right: 2rem;
+    /* Responsive inline padding for comfortable gutters on all screens */
+    padding-left: clamp(1rem, 4vw, 2rem);
+    padding-right: clamp(1rem, 4vw, 2rem);
   }
 
   * {
@@ -146,6 +147,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
   }
 }
 

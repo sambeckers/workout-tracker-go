@@ -1,0 +1,69 @@
+#!/usr/bin/env zsh
+
+# Simple helper to start the dev server and open the browser
+# Usage:
+#   ./run_server            # uses PORT=8080 by default
+#   PORT=5173 ./run_server  # override port
+#   OPEN_BROWSER=0 ./run_server  # do not open a browser
+
+set -e
+set -u
+set -o pipefail
+
+PORT="${PORT:-8080}"
+URL="http://localhost:${PORT}/"
+
+# Absolute path of this script (safe for zsh and spaces in path)
+SCRIPT_DIR="$(cd -- "$(dirname "${(%):-%N}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Error: bun is not installed. Install from https://bun.sh" >&2
+  exit 1
+fi
+
+# Install deps if needed
+if [ ! -d "node_modules" ]; then
+  echo "Installing dependencies with bun..."
+  bun install
+fi
+
+## Ensure port is free and no prior dev servers linger
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+  PIDS=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t | tr '\n' ' ')
+  echo "Killing processes on port $PORT: $PIDS"
+  kill -9 $PIDS || true
+fi
+pkill -f "bun run dev" >/dev/null 2>&1 || true
+pkill -f "vite --port" >/dev/null 2>&1 || true
+
+echo "Starting dev server on port $PORT..."
+nohup bun run dev --port "$PORT" > .dev_server.log 2>&1 &
+echo $! > .dev_server.pid
+
+# Wait for server to respond
+printf "Waiting for server"
+for i in {1..60}; do
+  if curl -sSf "$URL" >/dev/null 2>&1; then
+    printf " - ready at %s\n" "$URL"
+    break
+  fi
+  printf "."
+  sleep 0.5
+done
+
+# Open browser unless disabled (prefer VS Code Simple Browser if available)
+if [ "${OPEN_BROWSER:-1}" -eq 1 ]; then
+  if command -v code >/dev/null 2>&1; then
+    # VS Code simple browser will open inside editor; fallback to OS open
+    code --open-url "$URL" >/dev/null 2>&1 || open "$URL" >/dev/null 2>&1 || xdg-open "$URL" >/dev/null 2>&1 || true
+  else
+    case "$OSTYPE" in
+      darwin*) open "$URL" ;;
+      linux*)  xdg-open "$URL" >/dev/null 2>&1 || true ;;
+      *)       echo "Open $URL in your browser" ;;
+    esac
+  fi
+fi
+
+exit 0

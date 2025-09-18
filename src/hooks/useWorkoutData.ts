@@ -44,6 +44,17 @@ export interface ExerciseLog {
   exercise?: Exercise;
 }
 
+export interface Category {
+  id: string;
+  user_id?: string;
+  name: string;
+  icon?: string;
+  image_url?: string;
+  is_default?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Goal {
   goal_id: string;
   user_id: string;
@@ -382,3 +393,31 @@ export const useExportWorkoutData = () => {
     },
   });
 };
+
+export const useUpdateExercise = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ exerciseId, data }: { exerciseId: string; data: Partial<Exercise> }) => {
+      const { data: result, error } = await supabase
+        .from('exercises')
+        .update(data)
+        .eq('exercise_id', exerciseId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      toast.success('Exercise updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to update exercise');
+      console.error(error);
+    },
+  });
+};
+
+// TODO: Add categories hooks after running migration and regenerating Supabase types

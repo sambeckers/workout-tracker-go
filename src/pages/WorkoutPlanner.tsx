@@ -9,8 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save } from 'lucide-react';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import NumberStepper from '@/components/ui/number-stepper';
 import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseLogs, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
 import { toast } from 'sonner';
 import { format } from '@/lib/date-utils';
@@ -55,7 +55,7 @@ const WorkoutPlanner = () => {
       name: exercise.name,
       muscle_group: exercise.muscle_group,
       target_sets: 3,
-      target_reps: '8-12',
+      target_reps: '10',
       notes: '',
       target_weight: 20,
       target_duration_sec: 0
@@ -65,7 +65,7 @@ const WorkoutPlanner = () => {
   };
 
   const removeExercise = (index: number) => {
-    setSelectedExercises(selectedExercises.filter((_, i) => i !== index));
+    setSelectedExercises(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateExercise = (index: number, field: keyof SelectedExercise, value: any) => {
@@ -310,7 +310,7 @@ const WorkoutPlanner = () => {
                   </div>
                 ) : (
                   selectedExercises.map((exercise, index) => (
-                    <Card key={index} className="p-4">
+                    <Card key={exercise.exercise_id} className="p-4">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <h4 className="font-medium">{exercise.name}</h4>
@@ -323,50 +323,61 @@ const WorkoutPlanner = () => {
                         <Button
                           size="sm"
                           variant="ghost"
+                          type="button"
                           onClick={() => removeExercise(index)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         <div className="space-y-2">
-                          <Label className="text-sm">Sets: {exercise.target_sets}</Label>
-                          <Slider
-                            value={[exercise.target_sets]}
-                            onValueChange={(v) => updateExercise(index, 'target_sets', v[0])}
+                          <Label className="text-sm">Sets</Label>
+                          <NumberStepper
+                            value={exercise.target_sets}
+                            onChange={(v) => updateExercise(index, 'target_sets', v)}
                             min={1}
                             max={10}
                             step={1}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm">Weight ({useLbs ? 'lbs' : 'kg'}): {useLbs ? Math.round((exercise.target_weight||0)*2.20462) : exercise.target_weight || 0}</Label>
-                          <Slider
-                            value={[useLbs ? Math.round((exercise.target_weight||0)*2.20462) : (exercise.target_weight||0)]}
-                            onValueChange={(v) => updateExercise(index, 'target_weight', useLbs ? Math.round(v[0]/2.20462) : v[0])}
+                          <Label className="text-sm">Weight</Label>
+                          <NumberStepper
+                            value={useLbs ? Math.round((exercise.target_weight||0)*2.20462) : (exercise.target_weight||0)}
+                            onChange={(v) => updateExercise(index, 'target_weight', useLbs ? Math.round(v/2.20462) : v)}
                             min={0}
                             max={useLbs ? 400 : 180}
                             step={useLbs ? 5 : 2}
+                            unit={useLbs ? 'lbs' : 'kg'}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm flex items-center gap-1">Time/Set (sec) {exercise.target_duration_sec ? `: ${exercise.target_duration_sec}` : ''}</Label>
-                          <Slider
-                            value={[exercise.target_duration_sec || 0]}
-                            onValueChange={(v) => updateExercise(index, 'target_duration_sec', v[0])}
+                          <Label className="text-sm flex items-center gap-2">Time/Set
+                            <Switch
+                              checked={(exercise.target_duration_sec || 0) > 0}
+                              onCheckedChange={(checked) => updateExercise(index, 'target_duration_sec', checked ? (exercise.target_duration_sec || 30) : 0)}
+                            />
+                          </Label>
+                          <NumberStepper
+                            value={exercise.target_duration_sec || 0}
+                            onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
                             min={0}
-                            max={180}
+                            max={300}
                             step={5}
+                            unit="sec"
+                            disabled={(exercise.target_duration_sec || 0) === 0}
                           />
                         </div>
                       </div>
                       <div className="grid gap-2 mt-4">
-                        <Label className="text-sm">Target Reps Pattern</Label>
-                        <Input
-                          value={exercise.target_reps}
-                          onChange={(e) => updateExercise(index, 'target_reps', e.target.value)}
-                          placeholder="e.g., 8-12, 15, 5-5-5, AMRAP"
+                        <Label className="text-sm">Reps per set</Label>
+                        <NumberStepper
+                          value={parseInt(exercise.target_reps || '0') || 10}
+                          onChange={(v) => updateExercise(index, 'target_reps', String(Math.max(0, v || 0)))}
+                          min={0}
+                          max={100}
+                          step={1}
                         />
                       </div>
                       
@@ -418,7 +429,8 @@ const WorkoutPlanner = () => {
                   <div className="space-y-1">
                     {selectedExercises.map((ex, i) => (
                       <div key={i} className="text-sm text-muted-foreground">
-                        {ex.target_sets}x {ex.target_reps} {ex.name}
+                        {ex.target_sets} sets × {ex.target_reps} reps @ {useLbs ? Math.round((ex.target_weight||0)*2.20462) : ex.target_weight || 0} {useLbs ? 'lbs' : 'kg'}
+                        <div className="font-medium text-xs">{ex.name}</div>
                       </div>
                     ))}
                   </div>

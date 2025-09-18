@@ -9,7 +9,15 @@ Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+    <div
+      ref={ref}
+      className={cn(
+        // Compact, consistent header spacing with slightly tighter vertical rhythm
+        "flex flex-col space-y-1 p-4 md:p-6 pb-3 md:pb-4",
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 CardHeader.displayName = "CardHeader";
@@ -29,13 +37,31 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 CardDescription.displayName = "CardDescription";
 
 const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />,
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        // Keep compact but add a small top offset from header for alignment
+        "p-4 md:p-6 pt-3",
+        className,
+      )}
+      {...props}
+    />
+  ),
 );
 CardContent.displayName = "CardContent";
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />
+    <div
+      ref={ref}
+      className={cn(
+        // Tight, aligned with content spacing
+        "flex items-center p-4 md:p-6 pt-3",
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 CardFooter.displayName = "CardFooter";

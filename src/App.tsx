@@ -72,7 +72,7 @@ const App = () => (
                             <div className="flex-1 flex flex-col">
                               <CoverArea />
                               <main className="flex-1 bg-white dark:bg-gray-900">
-                                <div className="app-container py-8">
+                                <div className="app-container py-6 sm:py-8 md:py-10">
                                    <Routes>
                                      <Route path="/" element={<Index />} />
                                      <Route path="/schedule" element={<Schedule />} />
