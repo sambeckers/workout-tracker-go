@@ -903,9 +903,13 @@ const Exercises = () => {
                     <Label className="text-sm font-medium text-muted-foreground">Quick Actions</Label>
                     <div className="space-y-2 mt-2">
                       <Button 
+                        type="button"
                         variant="outline" 
                         className="w-full justify-start"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Edit button clicked, viewDetailsOpen:', viewDetailsOpen);
                           openEditExercise(viewDetailsOpen);
                           setViewDetailsOpen(null);
                         }}
