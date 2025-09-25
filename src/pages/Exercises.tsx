@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Search, Filter, Plus, Pencil, Trash2, ChevronDown, Settings, Dumbbell } from 'lucide-react';
+import { Search, Filter, Plus, Pencil, ChevronDown, Dumbbell } from 'lucide-react';
 import { useExercises, useUpdateExercise } from '@/hooks/useWorkoutData';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -100,21 +100,54 @@ const SEED_EXERCISE_NAMES = [
 
 const mapExerciseToGroup = (name: string): string => {
   const n = name.toLowerCase();
-  // Specific first
+  
+  // Handle specific multi-muscle exercises with comma-separated values
+  if (/(5.*min.*pull.*up|5.*minute.*pull.*up|pull.*up.*5.*min)/.test(n)) return 'Lats, Biceps, Shoulders';
+  if (/(push.*up|pushup)/.test(n)) return 'Chest, Triceps, Shoulders';
+  if (/(pull.*up|pullup)/.test(n) && !/(5.*min|minute)/.test(n)) return 'Lats, Biceps, Shoulders';
+  if (/(deadlift)/.test(n)) return 'Glutes, Hamstrings, Lower back';
+  if (/(squat)/.test(n)) return 'Glutes, Quadriceps';
+  if (/(lunge)/.test(n)) return 'Glutes, Quadriceps';
+  if (/(plank)/.test(n)) return 'Abs, Shoulders';
+  if (/(renegade.*row)/.test(n)) return 'Lats, Abs, Shoulders';
+  if (/(burpee)/.test(n)) return 'Full Body (cardio)';
+  
+  // Cardio/conditioning exercises
+  if (/(boxing|crosstraining|cycling|running|treadmill|rowing|padel|tennis|soccer|stairs|yoga|stretch|dynamic|sauna)/.test(n)) return 'Full Body (cardio)';
+  
+  // Specific muscle groups (most specific first)
   if (/(wrist|forearm)/.test(n)) return 'Forearms';
-  if (/calf/.test(n)) return 'Lower Body';
-  if (/(lunge|squat|leg\s|leg\b|hamstring|quad|thigh|hip|glute)/.test(n)) return 'Lower Body';
-  if (/(deadlift|romanian deadlift)/.test(n)) return 'Lower Body';
-  if (/(row|pulldown|reverse fly|seated cable row|vertical traction|back extension)/.test(n)) return 'Back';
-  if (/(bench|chest|pectoral)/.test(n)) return 'Chest';
-  if (/(press)/.test(n) && /(overhead|shoulder)/.test(n)) return 'Shoulder';
-  if (/(lateral raise|rear delt|upright row|scapular|rotator cuff|rotation|face pull|forward raise)/.test(n)) return 'Shoulder';
-  if (/(bicep|tricep|skullcrusher|dip|pushdown|kickback|curl)/.test(n)) return 'Arm';
-  if (/(plank|twist|abdominal|abs|torso)/.test(n)) return 'Abs';
-  if (/(pull-up|push-up)/.test(n)) return 'Upper Body';
-  if (/(boxing|crosstraining|cycling|running|treadmill|rowing|padel|tennis|soccer|stairs|yoga|stretch|dynamic)/.test(n)) return 'Full Body';
-  if (/hip/.test(n)) return 'Lower Body';
-  return 'Upper Body';
+  if (/(calf|calves)/.test(n)) return 'Calves';
+  
+  // Lower body specifics
+  if (/(glute)/.test(n)) return 'Glutes';
+  if (/(quad|thigh)/.test(n)) return 'Quadriceps';
+  if (/(hamstring)/.test(n)) return 'Hamstrings';
+  if (/(hip|abduction|abductor)/.test(n)) return 'Hips';
+  
+  // Upper body specifics
+  if (/(bicep|curl)/.test(n) && !/(tricep|pushdown)/.test(n)) return 'Biceps';
+  if (/(tricep|skullcrusher|dip|pushdown|kickback|extension)/.test(n) && !/bicep/.test(n)) return 'Triceps';
+  if (/(bench|chest|pectoral|fly)/.test(n)) return 'Chest';
+  if (/(lat|pulldown|vertical traction)/.test(n)) return 'Lats';
+  if (/(trap|upright row)/.test(n)) return 'Traps';
+  if (/(row|reverse fly|seated cable row|back extension)/.test(n) && !/upright/.test(n)) return 'Lats';
+  
+  // Shoulder specifics
+  if (/(lateral raise|rear delt|forward raise)/.test(n)) return 'Anterior - Deltoid';
+  if (/(rotator cuff|rotation|face pull|exorotation|endorotation|external rotation)/.test(n)) return 'Rotator cuff';
+  if (/(press)/.test(n) && /(overhead|shoulder)/.test(n)) return 'Shoulders';
+  if (/(scapular)/.test(n)) return 'Shoulders';
+  
+  // Core specifics
+  if (/(plank|twist|abdominal|abs|igor)/.test(n)) return 'Abs';
+  if (/(torso|rotary torso)/.test(n)) return 'Obliques';
+  if (/(lower back|back extension)/.test(n)) return 'Lower back';
+  
+  // Default fallbacks
+  if (/(arm)/.test(n)) return 'Biceps';
+  
+  return 'Shoulders'; // Conservative default for upper body
 };
 
 const inferEquipment = (name: string): string => {
@@ -158,9 +191,32 @@ const SEED_EXERCISES = Array.from(new Set(SEED_EXERCISE_NAMES.map(n => n.trim())
     return { name, muscle_group, equipment, description };
   });
 
+// Helper function to split and display multiple muscle groups
+const formatMuscleGroups = (muscleGroup: string): string[] => {
+  if (!muscleGroup) return [];
+  return muscleGroup.split(',').map(g => g.trim()).filter(Boolean);
+};
+
+const getFirstMuscleGroup = (muscleGroup: string): string => {
+  const groups = formatMuscleGroups(muscleGroup);
+  return groups[0] || muscleGroup;
+};
+
+// Ensure a value shown in Select matches an available category or 'none'
+const normalizeToAvailableCategory = (value: string, available: { name: string }[]): string => {
+  if (!value) return 'none';
+  const first = getFirstMuscleGroup(value);
+  const match = available.find(c => c.name.toLowerCase() === first.toLowerCase());
+  return match ? match.name : 'none';
+};
+
 // Render-time fallbacks
-const getDisplayGroup = (e: { name: string; muscle_group?: string }) => e.muscle_group || mapExerciseToGroup(e.name);
-const getDisplayDescription = (e: { name: string; muscle_group?: string; description?: string }) => e.description || buildDescription(e.name, getDisplayGroup(e));
+const getDisplayGroup = (e: { name: string; muscle_group?: string }) => {
+  const mg = e.muscle_group || '';
+  if (!mg || mg.toLowerCase() === 'none') return mapExerciseToGroup(e.name);
+  return mg;
+};
+const getDisplayDescription = (e: { name: string; muscle_group?: string; description?: string }) => e.description || buildDescription(e.name, getFirstMuscleGroup(getDisplayGroup(e)));
 const getDisplayEquipment = (e: { name: string; equipment?: string }) => e.equipment || inferEquipment(e.name);
 
 const Exercises = () => {
@@ -219,11 +275,8 @@ const Exercises = () => {
     { id: 'Shins', name: 'Shins', icon: 'Bone', imageUrl: '/muscles/shins.svg' },
   ];
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const categories: Category[] = BASE_CATEGORIES;
   const [showAllCats, setShowAllCats] = useState(false);
-  const [createCatOpen, setCreateCatOpen] = useState(false);
-  const [editCatOpen, setEditCatOpen] = useState<null | Category>(null);
-  const [catForm, setCatForm] = useState<{ name: string; icon: string; imageUrl?: string }>({ name: '', icon: 'Dumbbell', imageUrl: '' });
   const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [viewDetailsOpen, setViewDetailsOpen] = useState<null | any>(null);
   const [editExerciseOpen, setEditExerciseOpen] = useState<null | any>(null);
@@ -234,75 +287,7 @@ const Exercises = () => {
     difficulty: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced'
   });
 
-  // Load categories from localStorage with fallback recovery
-  useEffect(() => {
-    try {
-      // Try primary storage
-      const saved = localStorage.getItem('custom-categories-v1');
-      if (saved) {
-        const parsed: Category[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCategories(parsed);
-          return;
-        }
-      }
-      
-      // Try backup storage
-      const backup = localStorage.getItem('muscle-groups-backup');
-      if (backup) {
-        const names: string[] = JSON.parse(backup);
-        if (Array.isArray(names) && names.length > 0) {
-          // Reconstruct categories from names
-          const reconstructed = names.map((name, index) => ({
-            id: name,
-            name,
-            icon: 'Dumbbell',
-          }));
-          setCategories(reconstructed);
-          // Save to primary storage
-          saveCategories(reconstructed);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load categories from localStorage:', e);
-    }
-    
-    // Fallback to base categories
-    setCategories(BASE_CATEGORIES);
-    saveCategories(BASE_CATEGORIES);
-  }, []);
-
-  // Periodic backup of categories (every 5 minutes when categories change)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (categories.length > 0) {
-        try {
-          const lastUpdated = localStorage.getItem('categories-last-updated');
-          if (!lastUpdated || new Date().getTime() - new Date(lastUpdated).getTime() > 5 * 60 * 1000) {
-            saveCategories(categories);
-          }
-        } catch (e) {
-          console.warn('Periodic backup failed:', e);
-        }
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval);
-  }, [categories]);
-
-  const saveCategories = (next: Category[]) => {
-    setCategories(next);
-    try { 
-      localStorage.setItem('custom-categories-v1', JSON.stringify(next));
-      // Also store a backup with a different key for redundancy
-      localStorage.setItem('muscle-groups-backup', JSON.stringify(next.map(c => c.name)));
-      // Store a timestamp to track when categories were last updated
-      localStorage.setItem('categories-last-updated', new Date().toISOString());
-    } catch (e) {
-      console.warn('Failed to save categories to localStorage:', e);
-    }
-  };
+  // Categories are fixed; no local persistence or editing
 
   const ALL_CATEGORY: Category = { id: 'All', name: 'All Exercises', icon: 'Target', diagram: '🏋️' };
   const sortedCategories: Category[] = useMemo(
@@ -335,36 +320,19 @@ const Exercises = () => {
     const q = searchTerm.toLowerCase();
     const desc = getDisplayDescription(exercise).toLowerCase();
     const matchesSearch = exercise.name.toLowerCase().includes(q) || desc.includes(q);
+    
     const group = getDisplayGroup(exercise);
-    const matchesCategory = selectedCategory === 'All' || group === selectedCategory;
+    const groups = formatMuscleGroups(group);
+    const matchesCategory = selectedCategory === 'All' || 
+                           groups.includes(selectedCategory) || 
+                           group === selectedCategory;
+    
     return matchesSearch && matchesCategory;
   });
 
-  const handleCreate = async () => {
-    if (!form.name) return;
-    const { error } = await supabase.from('exercises').insert({
-      name: form.name,
-      muscle_group: form.muscle_group || null,
-      description: form.description || null,
-      equipment: form.equipment || null,
-      difficulty: form.difficulty || null
-    });
-    if (error) {
-      toast.error('Failed to create exercise');
-    } else {
-      toast.success('Exercise created');
-      setCreateOpen(false);
-      setForm({ name: '', muscle_group: '', description: '', equipment: '', difficulty: 'Beginner' });
-    }
-  };
-
-  const addToWorkout = (exerciseId: string) => {
-    navigate(`/workout/new?exerciseId=${exerciseId}`);
-  };
-
   const openEditExercise = (exercise: any) => {
     setEditForm({
-      muscle_group: exercise.muscle_group || '',
+      muscle_group: normalizeToAvailableCategory(exercise.muscle_group || '', categories),
       equipment: exercise.equipment || '',
       description: exercise.description || '',
       difficulty: exercise.difficulty || 'Beginner'
@@ -372,25 +340,36 @@ const Exercises = () => {
     setEditExerciseOpen(exercise);
   };
 
+  const handleCreate = async () => {
+    if (!form.name.trim()) return;
+    const { error } = await supabase.from('exercises').insert({
+      name: form.name.trim(),
+      muscle_group: (form.muscle_group && form.muscle_group !== 'none') ? form.muscle_group : null,
+      description: form.description || null,
+      equipment: form.equipment || null,
+      difficulty: form.difficulty || null
+    });
+    if (error) {
+      toast.error('Failed to create exercise');
+      console.error('[Exercises] Create failed', error);
+    } else {
+      toast.success('Exercise created');
+      setCreateOpen(false);
+      setForm({ name: '', muscle_group: '', description: '', equipment: '', difficulty: 'Beginner' });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    }
+  };
+
   const handleUpdateExercise = async () => {
     if (!editExerciseOpen) return;
-    
-    // Auto-add new muscle group to categories if it doesn't exist
-    if (editForm.muscle_group && 
-        editForm.muscle_group.trim() && 
-        !categories.some(cat => cat.name.toLowerCase() === editForm.muscle_group.toLowerCase())) {
-      const newCategory: Category = {
-        id: editForm.muscle_group.trim(),
-        name: editForm.muscle_group.trim(),
-        icon: 'Dumbbell'
-      };
-      const updatedCategories = [...categories, newCategory];
-      saveCategories(updatedCategories);
-    }
-    
+
+    const isNone = editForm.muscle_group === 'none';
+    const isValid = categories.some(cat => cat.name === editForm.muscle_group);
+    const cleanMuscleGroup = isNone || !isValid ? '' : editForm.muscle_group;
+
     const updateData: any = {};
-    if (editForm.muscle_group !== editExerciseOpen.muscle_group) {
-      updateData.muscle_group = editForm.muscle_group || null;
+    if (cleanMuscleGroup !== editExerciseOpen.muscle_group) {
+      updateData.muscle_group = cleanMuscleGroup || null;
     }
     if (editForm.equipment !== editExerciseOpen.equipment) {
       updateData.equipment = editForm.equipment || null;
@@ -402,16 +381,27 @@ const Exercises = () => {
       updateData.difficulty = editForm.difficulty || null;
     }
 
-    if (Object.keys(updateData).length > 0) {
-      updateExerciseMutation.mutate({
-        exerciseId: editExerciseOpen.exercise_id,
-        data: updateData
-      });
+    if (Object.keys(updateData).length === 0) {
+      toast.info('No changes to save');
+      return;
     }
-    
-    setEditExerciseOpen(null);
-  };
 
+    try {
+      console.debug('[Exercises] Updating exercise', {
+        id: editExerciseOpen.exercise_id,
+        name: editExerciseOpen.name,
+        updateData
+      });
+      await updateExerciseMutation.mutateAsync({
+        exerciseId: editExerciseOpen.exercise_id,
+        data: updateData,
+      });
+      setEditExerciseOpen(null);
+    } catch (err) {
+      // Error toast already shown in mutation onError; keep dialog open for correction
+      console.error('[Exercises] Update failed', err);
+    }
+  };
   // Seed missing exercises into Supabase
   useEffect(() => {
     const seed = async () => {
@@ -509,6 +499,68 @@ const Exercises = () => {
     if (!isLoading) dedupeAndEnrich();
   }, [isLoading, exercises, queryClient]);
 
+  // Force re-enrich all exercises with updated muscle group mappings
+  const forceUpdateMuscleGroups = async (opts?: { silent?: boolean }) => {
+    try {
+      const updates: Array<{ exercise_id: string; name: string; old_group: string | null; muscle_group: string }> = [];
+      const diffs: Array<{ name: string; from: string | null; to: string }> = [];
+
+      exercises.forEach((exercise) => {
+        const newGroup = mapExerciseToGroup(exercise.name);
+        const oldGroup = exercise.muscle_group ?? null;
+        const isCoarse = oldGroup && /^(upper body|lower body|back|shoulder|arm|full body)$/i.test(oldGroup);
+        if (oldGroup !== newGroup || isCoarse) {
+          updates.push({ exercise_id: exercise.exercise_id, name: exercise.name, old_group: oldGroup, muscle_group: newGroup });
+          diffs.push({ name: exercise.name, from: oldGroup, to: newGroup });
+        }
+      });
+
+      if (!updates.length) {
+        if (!opts?.silent) {
+          console.info('[MuscleGroups] No changes detected. Either the DB already matches or names do not map differently.');
+          toast.success('No muscle group changes detected.');
+        }
+        return;
+      }
+
+      if (!opts?.silent) {
+        console.groupCollapsed('[MuscleGroups] Pending updates');
+        console.table(diffs.slice(0, 20));
+        if (diffs.length > 20) console.info(`...and ${diffs.length - 20} more`);
+        console.groupEnd();
+      }
+
+      for (const u of updates) {
+        const { error } = await supabase
+          .from('exercises')
+          .update({ muscle_group: u.muscle_group })
+          .eq('exercise_id', u.exercise_id);
+        if (error) throw error;
+      }
+
+      if (!opts?.silent) toast.success(`Updated muscle groups for ${updates.length} exercises`);
+      // Small delay to ensure DB has applied changes before refetch
+      await new Promise((r) => setTimeout(r, 200));
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    } catch (err) {
+      console.error(err);
+      if (!opts?.silent) toast.error('Failed to update muscle groups');
+    }
+  };
+
+  // Auto-migrate muscle groups on initial load (silent)
+  useEffect(() => {
+    const run = async () => {
+      const key = 'mg-auto-updated-v1';
+      if (localStorage.getItem(key)) return;
+      if (!isLoading && exercises.length) {
+        await forceUpdateMuscleGroups({ silent: true });
+        localStorage.setItem(key, '1');
+      }
+    };
+    run();
+  }, [isLoading, exercises]);
+
   return (
   <div className="app-container p-8 space-y-8">
       {/* Header */}
@@ -517,13 +569,14 @@ const Exercises = () => {
           <h1 className="text-3xl font-bold text-foreground">Exercise Library</h1>
           <p className="text-muted-foreground mt-2">Discover and track exercises for every muscle group</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Exercise
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Exercise
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Create Exercise</DialogTitle>
@@ -535,7 +588,19 @@ const Exercises = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="ex-muscle">Muscle Group</Label>
-                <Input id="ex-muscle" value={form.muscle_group} onChange={e => setForm(f => ({ ...f, muscle_group: e.target.value }))} placeholder="Chest, Back..." />
+                <Select value={form.muscle_group || 'none'} onValueChange={(v) => setForm(f => ({ ...f, muscle_group: v }))}>
+                  <SelectTrigger id="ex-muscle">
+                    <SelectValue placeholder="Select muscle group" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    <SelectItem value="none">None</SelectItem>
+                    {sortedCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="ex-desc">Description</Label>
@@ -562,6 +627,7 @@ const Exercises = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -604,16 +670,7 @@ const Exercises = () => {
                       <ChevronDown className={`h-4 w-4 transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
                     </Button>
                   </CollapsibleTrigger>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    onClick={() => { setCatForm({ name: '', icon: 'Dumbbell' }); setCreateCatOpen(true); }}
-                    title="Manage categories"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
+                  {/* Category management removed */}
                 </div>
               </div>
             </CardHeader>
@@ -646,9 +703,7 @@ const Exercises = () => {
                       {showAllCats ? 'Show less' : `Show more (${categories.length - 10})`}
                     </Button>
                   )}
-                  <Button className="w-full" variant="outline" onClick={() => { setCatForm({ name: '', icon: 'Dumbbell' }); setCreateCatOpen(true); }}>
-                    <Plus className="h-4 w-4 mr-2" /> New Category
-                  </Button>
+                  {/* New Category button removed */}
                 </div>
               </CardContent>
             </CollapsibleContent>
@@ -701,7 +756,23 @@ const Exercises = () => {
                         </div>
                         <div className="grid grid-cols-[auto,1fr] items-start gap-x-2">
                           <span className="font-medium">Muscle Group:</span>
-                          <span className="text-muted-foreground break-words">{getDisplayGroup(exercise)}</span>
+                          <div className="text-muted-foreground break-words">
+                            {(() => {
+                              const groups = formatMuscleGroups(getDisplayGroup(exercise));
+                              if (groups.length <= 1) {
+                                return <span>{getDisplayGroup(exercise)}</span>;
+                              }
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {groups.map((group, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-xs">
+                                      {group}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
                       
@@ -722,149 +793,69 @@ const Exercises = () => {
             <div className="space-y-6">
               {/* Category Header */}
               <div className="flex items-center gap-4 pb-3 border-b border-border/50">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-foreground">
-                    {selectedCategory === 'All' ? 'All Exercises' : selectedCategory}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    0 exercises available
-                  </p>
-                </div>
-              </div>
-              
-              {/* Empty Message */}
-              <div className="text-center py-12">
-                <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No exercises found</h3>
-                <p className="mt-2 text-muted-foreground">
-                  Try adjusting your search or filter criteria.
-                </p>
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Exercise
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Create Exercise</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="ex-name">Name</Label>
+                        <Input id="ex-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="ex-muscle">Muscle Group</Label>
+                        <Select value={form.muscle_group || 'none'} onValueChange={(v) => setForm(f => ({ ...f, muscle_group: v }))}>
+                          <SelectTrigger id="ex-muscle">
+                            <SelectValue placeholder="Select muscle group" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60 overflow-y-auto">
+                            <SelectItem value="none">None</SelectItem>
+                            {sortedCategories.map((category) => (
+                              <SelectItem key={category.id} value={category.name}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="ex-equip">Equipment</Label>
+                        <Input id="ex-equip" value={form.equipment} onChange={e => setForm(f => ({ ...f, equipment: e.target.value }))} placeholder="Dumbbell, Barbell, Machine..." />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="ex-diff">Difficulty</Label>
+                        <Select value={form.difficulty} onValueChange={(v) => setForm(f => ({ ...f, difficulty: v as any }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select difficulty" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Beginner">Beginner</SelectItem>
+                            <SelectItem value="Intermediate">Intermediate</SelectItem>
+                            <SelectItem value="Advanced">Advanced</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                      <Button disabled={!form.name} onClick={handleCreate}>Create</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Manage Categories Dialog */}
-      <Dialog open={createCatOpen} onOpenChange={setCreateCatOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Categories</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 py-2">
-            {/* Existing Categories */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Current Categories</Label>
-              <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                {[...categories].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })).map((category) => {
-                  return (
-                    <div key={category.id} className="flex items-center justify-between gap-2 p-2 rounded border">
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium">{category.name}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => { setEditCatOpen(category); setCatForm({ name: category.name, icon: category.icon }); }}
-                          title="Edit category"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => {
-                            const next = categories.filter(c => c.id !== category.id);
-                            saveCategories(next);
-                            if (selectedCategory === category.id) setSelectedCategory('All');
-                          }}
-                          title="Delete category"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* Add New Category */}
-            <div className="space-y-4 pt-4 border-t">
-              <Label className="text-sm font-medium">Add New Category</Label>
-              <div className="grid gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="cat-name">Name</Label>
-                  <Input id="cat-name" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} placeholder="Enter category name" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="cat-img">Image URL (optional)</Label>
-                  <Input id="cat-img" value={catForm.imageUrl || ''} onChange={e => setCatForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://... (prefer transparent SVG/PNG)" />
-                </div>
-                {/* Icons and previews removed per request */}
-                <Button
-                  disabled={!catForm.name.trim()}
-                  onClick={() => {
-                    const id = catForm.name.trim();
-                    if (!id) return;
-                    if (displayedCategories.some(c => c.id.toLowerCase() === id.toLowerCase())) return;
-                    const next = [...categories, { id, name: catForm.name.trim(), icon: catForm.icon, imageUrl: (catForm.imageUrl || '').trim() }];
-                    saveCategories(next);
-                    setCatForm({ name: '', icon: 'Dumbbell', imageUrl: '' });
-                  }}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Category
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setCreateCatOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Category Dialog */}
-      <Dialog open={!!editCatOpen} onOpenChange={(o) => !o && setEditCatOpen(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Category</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-cat-name">Name</Label>
-              <Input id="edit-cat-name" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-cat-img">Image URL (optional)</Label>
-              <Input id="edit-cat-img" value={catForm.imageUrl || ''} onChange={e => setCatForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="https://..." />
-            </div>
-            {/* Icons and previews removed per request */}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditCatOpen(null)}>Cancel</Button>
-            <Button
-              disabled={!catForm.name.trim()}
-              onClick={() => {
-                if (!editCatOpen) return;
-                const newId = catForm.name.trim();
-                const next = categories.map(c => c.id === editCatOpen.id ? { ...c, id: newId, name: catForm.name.trim(), icon: catForm.icon, imageUrl: (catForm.imageUrl || '').trim() } : c);
-                saveCategories(next);
-                if (selectedCategory === editCatOpen.id) setSelectedCategory(newId);
-                setEditCatOpen(null);
-              }}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Category management removed */}
 
       {/* View Exercise Details Dialog */}
       <Dialog open={!!viewDetailsOpen} onOpenChange={(o) => !o && setViewDetailsOpen(null)}>
@@ -969,41 +960,23 @@ const Exercises = () => {
               <Label htmlFor="edit-muscle-group">Muscle Group</Label>
               <div className="space-y-2">
                 <Select 
-                  value={editForm.muscle_group} 
-                  onValueChange={(value) => {
-                    if (value === '__custom__') {
-                      // Switch to input mode for custom entry
-                      return;
-                    }
-                    setEditForm({ ...editForm, muscle_group: value });
-                  }}
+                  value={editForm.muscle_group}
+                  onValueChange={(value) => setEditForm({ ...editForm, muscle_group: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select muscle group" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 overflow-y-auto">
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {sortedCategories.map((category) => (
                       <SelectItem key={category.id} value={category.name}>
                         {category.name}
                       </SelectItem>
                     ))}
-                    <SelectItem value="__custom__" className="text-blue-600 font-medium">
-                      + Add Custom Muscle Group
-                    </SelectItem>
+                    {/* Custom option removed */}
                   </SelectContent>
                 </Select>
-                
-                {/* Custom input fallback */}
-                <div className="text-xs text-muted-foreground">
-                  Or type a custom muscle group:
-                </div>
-                <Input
-                  placeholder="Type custom muscle group..."
-                  value={editForm.muscle_group}
-                  onChange={(e) => setEditForm({ ...editForm, muscle_group: e.target.value })}
-                  className="text-sm"
-                />
+                {/* Free-text input removed; restrict to predefined categories */}
               </div>
             </div>
             

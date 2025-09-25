@@ -399,23 +399,53 @@ export const useUpdateExercise = () => {
   
   return useMutation({
     mutationFn: async ({ exerciseId, data }: { exerciseId: string; data: Partial<Exercise> }) => {
+      console.debug('[useUpdateExercise] Starting update:', { exerciseId, updateData: data });
+      
+      // First check if the exercise exists
+      const { data: existing, error: checkError } = await supabase
+        .from('exercises')
+        .select('exercise_id, name')
+        .eq('exercise_id', exerciseId);
+      
+      if (checkError) {
+        console.error('[useUpdateExercise] Check error:', checkError);
+        throw new Error(`Database check failed: ${checkError.message}`);
+      }
+      
+      console.debug('[useUpdateExercise] Existing exercise check:', { exerciseId, existing });
+      
+      if (!existing || existing.length === 0) {
+        throw new Error(`Exercise with ID ${exerciseId} not found in database`);
+      }
+
+      // Proceed with update
       const { data: result, error } = await supabase
         .from('exercises')
         .update(data)
         .eq('exercise_id', exerciseId)
-        .select()
-        .single();
+        .select();
       
-      if (error) throw error;
-      return result;
+      console.debug('[useUpdateExercise] Update result:', { exerciseId, result, error });
+      
+      if (error) {
+        throw new Error(`Update failed: ${error.message}`);
+      }
+      
+      if (!result || result.length === 0) {
+        throw new Error(`Update failed:\nExercise with ID ${exerciseId} could not be updated`);
+      }
+      
+      console.debug('[useUpdateExercise] Update successful');
+      return result[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
       toast.success('Exercise updated successfully');
     },
     onError: (error) => {
-      toast.error('Failed to update exercise');
-      console.error(error);
+      console.error('[useUpdateExercise] Mutation error:', error);
+      const message = error?.message || 'Unknown error';
+      toast.error(`Failed to update exercise: ${message}`);
     },
   });
 };
