@@ -1,5 +1,5 @@
 // Clean rebuilt WorkoutSession component (single definition, removed duplicates)
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession } from '@/hooks/useWorkoutData';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 // Local interfaces describing enriched exercise + sets for UI
@@ -43,6 +44,17 @@ const WorkoutSession = () => {
   const queryClient = useQueryClient();
   const currentWorkout = useMemo(()=>sessions.find(s=>s.session_id===id), [sessions,id]);
 
+  // Initialize autosave
+  const autoSave = useAutoSave({
+    delay: 1500,
+    onSuccess: () => {
+      // Optional: could show a subtle success indicator
+    },
+    onError: (error) => {
+      toast.error('Auto-save failed');
+    }
+  });
+
   // Local state
   const [exercises,setExercises] = useState<ExerciseWithSets[]>([]);
   const [duration,setDuration] = useState(0);
@@ -71,10 +83,74 @@ const WorkoutSession = () => {
   const createSessionIfNeeded = async ()=>{ if(id!=='new') return; if(createSession.isPending) return; try { const now=new Date(); const date=now.toISOString().slice(0,10); const time=now.toTimeString().slice(0,5); const session=await createSession.mutateAsync({ date,time,status:'Planned' }); navigate(`/workout/${session.session_id}`); } catch { toast.error('Failed to create session'); } };
   useEffect(()=>{ if(id==='new' && !currentWorkout && !createSession.isPending) createSessionIfNeeded(); }, [id,currentWorkout]);
 
+  // Auto-save session duration
+  useEffect(() => {
+    if (currentWorkout && duration > 0) {
+      autoSave.debouncedSaveSession(currentWorkout.session_id, { 
+        duration_minutes: Math.floor(duration / 60) 
+      });
+    }
+  }, [duration, currentWorkout?.session_id, autoSave.debouncedSaveSession]);
+
+  // Auto-save exercise logs when exercises change
+  const autoSaveExerciseLogs = useCallback(() => {
+    if (!currentWorkout || !exercises.length) return;
+    
+    const logs = exercises.map((exercise, index) => {
+      const baseLog = {
+        session_id: currentWorkout.session_id,
+        exercise_id: exercise.id,
+        exercise_order: index,
+      };
+
+      if (exercise.mode === 'time') {
+        if (exercise.timeCompleted && exercise.durationSeconds) {
+          return {
+            ...baseLog,
+            duration_seconds: exercise.durationSeconds,
+          };
+        }
+      } else {
+        const completedSets = exercise.sets.filter(s => s.completed);
+        if (completedSets.length > 0) {
+          const logData: any = {
+            ...baseLog,
+            sets: completedSets.length,
+          };
+          
+          if (exercise.enableReps !== false) {
+            logData.reps_per_set = completedSets.map(s => s.reps).join(',');
+          }
+          
+          if (exercise.enableWeight !== false) {
+            logData.weight_per_set = completedSets.map(s => s.weight).join(',');
+          }
+          
+          return logData;
+        }
+      }
+      
+      // Return placeholder for exercises with no data yet
+      return {
+        ...baseLog,
+        sets: 0,
+      };
+    }).filter(Boolean);
+
+    if (logs.length > 0) {
+      autoSave.debouncedSaveExerciseLogs(logs);
+    }
+  }, [exercises, currentWorkout, autoSave.debouncedSaveExerciseLogs]);
+
+  // Trigger autosave when exercises change
+  useEffect(() => {
+    if (currentWorkout && exercises.length > 0) {
+      autoSaveExerciseLogs();
+    }
+  }, [exercises, autoSaveExerciseLogs]);
+
   // Timer
   useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>setDuration(d=>d+1),1000); return ()=>clearInterval(int); }, [isActive]);
-
-  // Helpers
   const toggleSet=(eid:string,idx:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,completed:!s.completed}:s)}:ex));
   const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));
   const toggleMode=(eid:string)=>setExercises(p=>p.map(ex=>ex.id===eid?((ex.mode||'sets')==='sets'?{...ex,mode:'time',durationSeconds:ex.durationSeconds||60,timeCompleted:false}:{...ex,mode:'sets',sets:ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s}))}):ex));
@@ -85,13 +161,14 @@ const WorkoutSession = () => {
   const updateAllSets=(eid:string,field:'reps'|'weight',val:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,[field]:val}))}:ex));
   const setAllSetsCompletion=(eid:string,done:boolean)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,completed:done}))}:ex));
 
-  // Delete exercise
+  // Delete exercise with autosave
   const deleteExercise = (exerciseId: string) => {
     setExercises(prev => prev.filter(ex => ex.id !== exerciseId));
     toast.success('Exercise removed');
+    // Autosave will be triggered by the useEffect that watches exercises
   };
 
-  // Drag and drop reordering
+  // Drag and drop reordering with autosave
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     
@@ -100,6 +177,7 @@ const WorkoutSession = () => {
     items.splice(result.destination.index, 0, reorderedItem);
     
     setExercises(items);
+    // Autosave will be triggered by the useEffect that watches exercises
   };
 
   // Metadata save
@@ -185,6 +263,12 @@ const WorkoutSession = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={saveWorkout}><Save className="h-4 w-4" />Save</Button>
+          {autoSave.isAutoSaving && (
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <div className="animate-spin h-3 w-3 border border-gray-300 border-t-gray-600 rounded-full"></div>
+              Auto-saving...
+            </div>
+          )}
           {currentWorkout && (
             <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={updateSession.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
               <CheckSquare className="h-4 w-4" />{currentWorkout.status==='Done'?'Done':'Mark Done'}
