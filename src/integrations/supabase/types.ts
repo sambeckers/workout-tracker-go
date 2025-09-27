@@ -20,6 +20,7 @@ export type Database = {
           distance_km: number | null
           duration_seconds: number | null
           exercise_id: string
+          exercise_order: number | null
           log_id: string
           notes: string | null
           reps_per_set: string | null
@@ -33,6 +34,7 @@ export type Database = {
           distance_km?: number | null
           duration_seconds?: number | null
           exercise_id: string
+          exercise_order?: number | null
           log_id?: string
           notes?: string | null
           reps_per_set?: string | null
@@ -46,6 +48,7 @@ export type Database = {
           distance_km?: number | null
           duration_seconds?: number | null
           exercise_id?: string
+          exercise_order?: number | null
           log_id?: string
           notes?: string | null
           reps_per_set?: string | null
