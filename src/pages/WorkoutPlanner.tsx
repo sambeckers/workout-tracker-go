@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save } from 'lucide-react';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save, Search, Star, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import NumberStepper from '@/components/ui/number-stepper';
 import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseLogs, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
@@ -46,11 +47,51 @@ const WorkoutPlanner = () => {
 
   const [selectedExercises, setSelectedExercises] = useState<SelectedExercise[]>([]);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState<string>('all');
+  const [favoriteExercises, setFavoriteExercises] = useState<string[]>([]);
+  const [recentExercises, setRecentExercises] = useState<string[]>([]);
+  // Holds selections within the dialog before user confirms adding them
+  const [pendingSelection, setPendingSelection] = useState<any[]>([]);
   const { unit } = useUnitPreference();
   const useLbs = unit === 'lbs';
 
+  useEffect(() => {
+    try {
+      const fav = JSON.parse(localStorage.getItem('favorite-exercises') || '[]');
+      if (Array.isArray(fav)) setFavoriteExercises(fav);
+      const rec = JSON.parse(localStorage.getItem('recent-exercises') || '[]');
+      if (Array.isArray(rec)) setRecentExercises(rec);
+    } catch {}
+  }, []);
+
+  // Unique muscle groups for filter (supports multi-group entries)
+  const uniqueMuscleGroups = useMemo(() => {
+    const set = new Set<string>();
+    exercises.forEach(ex => {
+      if (ex.muscle_group) {
+        ex.muscle_group.split(',').map(g => g.trim()).filter(Boolean).forEach(g => set.add(g));
+      }
+    });
+    return Array.from(set).sort();
+  }, [exercises]);
+
   const addExercise = (exercise: any) => {
-    const newExercise: SelectedExercise = {
+    // legacy single add (still used elsewhere); wrap into pendingSelection then confirm
+    if (!pendingSelection.some(e => e.exercise_id === exercise.exercise_id)) {
+      setPendingSelection(prev => [...prev, exercise]);
+    } else {
+      // toggle off if already present
+      setPendingSelection(prev => prev.filter(e => e.exercise_id !== exercise.exercise_id));
+    }
+  };
+
+  const confirmAddSelectedExercises = () => {
+    if (pendingSelection.length === 0) {
+      setExerciseDialogOpen(false);
+      return;
+    }
+    const newlyAdded: SelectedExercise[] = pendingSelection.map(exercise => ({
       exercise_id: exercise.exercise_id,
       name: exercise.name,
       muscle_group: exercise.muscle_group,
@@ -59,9 +100,31 @@ const WorkoutPlanner = () => {
       notes: '',
       target_weight: 20,
       target_duration_sec: 0
-    };
-    setSelectedExercises([...selectedExercises, newExercise]);
+    }));
+    const combined = [...selectedExercises, ...newlyAdded.filter(ne => !selectedExercises.some(se => se.exercise_id === ne.exercise_id))];
+    setSelectedExercises(combined);
+    // record recents
+    try {
+      const next = [
+        ...newlyAdded.map(e => e.exercise_id),
+        ...recentExercises.filter(id => !newlyAdded.some(e => e.exercise_id === id))
+      ].slice(0, 10);
+      setRecentExercises(next);
+      localStorage.setItem('recent-exercises', JSON.stringify(next));
+    } catch {}
+    setPendingSelection([]);
     setExerciseDialogOpen(false);
+  };
+
+  const clearPendingSelection = () => setPendingSelection([]);
+
+  const toggleFavoriteExercise = (exerciseId: string) => {
+    setFavoriteExercises(prev => {
+      const exists = prev.includes(exerciseId);
+      const next = exists ? prev.filter(id => id !== exerciseId) : [exerciseId, ...prev];
+      try { localStorage.setItem('favorite-exercises', JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const removeExercise = (index: number) => {
@@ -252,48 +315,153 @@ const WorkoutPlanner = () => {
                   <Dumbbell className="h-5 w-5" />
                   Exercises ({selectedExercises.length})
                 </span>
-                <Dialog open={exerciseDialogOpen} onOpenChange={setExerciseDialogOpen}>
+                <Dialog
+                  open={exerciseDialogOpen}
+                  onOpenChange={(open) => {
+                    setExerciseDialogOpen(open);
+                    if (open) {
+                      // initialize pending with currently non-selected state
+                      setPendingSelection([]);
+                    } else {
+                      setPendingSelection([]);
+                    }
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Exercise
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[600px] overflow-y-auto">
+                  <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                      <DialogTitle>Select Exercise</DialogTitle>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Search className="h-4 w-4" />
+                        Select Exercises
+                        {pendingSelection.length > 0 && (
+                          <span className="text-xs font-normal text-muted-foreground">({pendingSelection.length} selected)</span>
+                        )}
+                      </DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-                      {filteredExercises.map((exercise) => (
-                        <Card 
-                          key={exercise.exercise_id} 
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => addExercise(exercise)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="space-y-2">
-                              <div className="font-medium">{exercise.name}</div>
-                              <div className="flex items-center gap-2">
+                    <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                      <div className="relative flex-1">
+                        <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search exercises..."
+                          value={exerciseSearch}
+                          onChange={(e) => setExerciseSearch(e.target.value)}
+                          className="pl-8"
+                        />
+                      </div>
+                      <Select value={muscleFilter} onValueChange={setMuscleFilter}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Muscle Group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Groups</SelectItem>
+                          {uniqueMuscleGroups.map(g => (
+                            <SelectItem key={g} value={g}>{g}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="border rounded-md h-[360px] overflow-auto p-2 space-y-2 bg-muted/40">
+                      {(() => {
+                        const q = exerciseSearch.trim().toLowerCase();
+                        const base = q.length === 0 ? filteredExercises : filteredExercises.filter(ex => {
+                          const hay = [ex.name, ex.muscle_group, ex.difficulty, ex.description]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return hay.includes(q);
+                        });
+                        const list = base.filter(ex => {
+                          if (muscleFilter === 'all') return true;
+                          const groups = (ex.muscle_group || '').toLowerCase().split(',').map(g => g.trim());
+                          return groups.includes(muscleFilter.toLowerCase());
+                        });
+                        // sort: favorites first, then by recency, then name
+                        const favSet = new Set(favoriteExercises);
+                        const recIndex = (id: string) => {
+                          const idx = recentExercises.indexOf(id);
+                          return idx === -1 ? 9999 : idx;
+                        };
+                        list.sort((a, b) => {
+                          const aFav = favSet.has(a.exercise_id) ? 1 : 0;
+                          const bFav = favSet.has(b.exercise_id) ? 1 : 0;
+                          if (aFav !== bFav) return bFav - aFav;
+                          const ar = recIndex(a.exercise_id);
+                          const br = recIndex(b.exercise_id);
+                          if (ar !== br) return ar - br;
+                          return a.name.localeCompare(b.name);
+                        });
+                        if (list.length === 0) {
+                          return (
+                            <div className="text-sm text-muted-foreground p-4">No exercises match your search.</div>
+                          );
+                        }
+                        return list.map((exercise) => {
+                          const isPending = pendingSelection.some(e => e.exercise_id === exercise.exercise_id);
+                          return (
+                            <button
+                              type="button"
+                              key={exercise.exercise_id}
+                              onClick={() => addExercise(exercise)}
+                              className={`w-full text-left p-3 rounded-md border flex flex-col gap-1 transition-smooth bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring relative ${isPending ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+                            >
+                              {isPending && (
+                                <span className="absolute top-2 right-2 text-primary text-xs font-medium">Selected</span>
+                              )}
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium text-sm">{exercise.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`p-1 h-6 w-6 ${favoriteExercises.includes(exercise.exercise_id) ? 'text-yellow-500' : ''}`}
+                                  onClick={(e) => { e.stopPropagation(); toggleFavoriteExercise(exercise.exercise_id); }}
+                                  title={favoriteExercises.includes(exercise.exercise_id) ? 'Remove from favorites' : 'Add to favorites'}
+                                >
+                                  <Star className={`h-3 w-3 ${favoriteExercises.includes(exercise.exercise_id) ? 'fill-yellow-400' : ''}`} />
+                                </Button>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
                                 {exercise.muscle_group && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {exercise.muscle_group}
-                                  </Badge>
+                                  <div className="flex flex-wrap gap-1">
+                                    {exercise.muscle_group.split(',').map(g => (
+                                      <Badge key={g.trim()} variant="secondary" className="text-[10px] px-1 py-0">{g.trim()}</Badge>
+                                    ))}
+                                  </div>
                                 )}
                                 {exercise.difficulty && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {exercise.difficulty}
-                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{exercise.difficulty}</Badge>
+                                )}
+                                {favoriteExercises.includes(exercise.exercise_id) && (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">Favorite</Badge>
+                                )}
+                                {recentExercises.includes(exercise.exercise_id) && (
+                                  <Badge variant="secondary" className="text-[10px] px-1 py-0">Recent</Badge>
                                 )}
                               </div>
                               {exercise.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {exercise.description}
-                                </p>
+                                <p className="text-xs text-muted-foreground line-clamp-2">{exercise.description}</p>
                               )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t mt-3">
+                      <div className="text-xs text-muted-foreground">
+                        {pendingSelection.length === 0 ? 'No exercises selected yet' : `${pendingSelection.length} exercise${pendingSelection.length>1?'s':''} ready to add`}
+                      </div>
+                      <div className="flex gap-2">
+                        {pendingSelection.length > 0 && (
+                          <Button variant="ghost" size="sm" onClick={clearPendingSelection}>Clear</Button>
+                        )}
+                        <Button size="sm" onClick={confirmAddSelectedExercises} disabled={pendingSelection.length===0}>
+                          <Check className="h-4 w-4 mr-1" /> Add Selected
+                        </Button>
+                      </div>
                     </div>
                   </DialogContent>
                 </Dialog>

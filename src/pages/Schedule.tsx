@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, Users, Target, Play, Edit, Trash2, Plus, Download, Dumbbell, CheckSquare } from 'lucide-react';
-import { useWorkoutSessions, useCreateWorkoutSession, useUpdateWorkoutSession, useDeleteWorkoutSession, useExportWorkoutData } from '@/hooks/useWorkoutData';
+import { CalendarDays, Clock, Users, Target, Play, Edit, Trash2, Plus, Download, Dumbbell, CheckSquare, Search } from 'lucide-react';
+import { useWorkoutSessions, useCreateWorkoutSession, useUpdateWorkoutSession, useDeleteWorkoutSession, useExportWorkoutData, useExercises, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from '@/lib/date-utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +22,73 @@ const Schedule = () => {
   const updateWorkoutMutation = useUpdateWorkoutSession();
   const deleteWorkoutMutation = useDeleteWorkoutSession();
   const exportDataMutation = useExportWorkoutData();
+  const { data: exercises = [], isLoading: exercisesLoading } = useExercises();
+  const bulkCreateLogs = useBulkCreateExerciseLogs();
+
+  const [showExerciseDialog, setShowExerciseDialog] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState<string>('all');
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(new Set());
+
+  const uniqueMuscleGroups = useMemo(() => {
+    const set = new Set<string>();
+    exercises.forEach(ex => {
+      if (ex.muscle_group) {
+        ex.muscle_group.split(',').map(g => g.trim()).filter(Boolean).forEach(g => set.add(g));
+      }
+    });
+    return Array.from(set).sort();
+  }, [exercises]);
+
+  const filteredExercises = useMemo(() => {
+    return exercises.filter(ex => {
+      if (exerciseSearch && !ex.name.toLowerCase().includes(exerciseSearch.toLowerCase())) return false;
+      if (muscleFilter !== 'all') {
+        const groups = (ex.muscle_group || '').toLowerCase();
+        if (!groups.split(',').some(g => g.trim() === muscleFilter.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [exercises, exerciseSearch, muscleFilter]);
+
+  const toggleExerciseSelect = (id: string) => {
+    setSelectedExerciseIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAddSelectedExercises = async () => {
+    if (!selectedExerciseIds.size) {
+      setShowExerciseDialog(false);
+      return;
+    }
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const session = await createWorkoutMutation.mutateAsync({
+        date: dateStr,
+        title: `Planned Workout (${selectedExerciseIds.size})`,
+        status: 'Planned',
+        notes: 'Auto-created from Schedule quick add'
+      } as any);
+      if (session?.session_id) {
+        const logs = Array.from(selectedExerciseIds).map(exercise_id => ({
+          session_id: session.session_id,
+            exercise_id,
+            sets: 0,
+            reps_per_set: '',
+            weight_per_set: ''
+        }));
+        await bulkCreateLogs.mutateAsync(logs as any);
+      }
+    } catch (e) {
+      console.error('Failed to add exercises to new session', e);
+    } finally {
+      setSelectedExerciseIds(new Set());
+      setShowExerciseDialog(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -123,15 +193,6 @@ const Schedule = () => {
             Export Data
           </Button>
           <Button 
-            onClick={handleQuickSession}
-            variant="outline"
-            className="flex items-center gap-2"
-            title="Start an immediate workout with basic timer - no planning"
-          >
-            <Play className="h-4 w-4" />
-            Quick Session
-          </Button>
-          <Button 
             onClick={handleCreateWorkout}
             className="flex items-center gap-2"
             title="Plan a detailed workout with exercises, sets, and schedule"
@@ -139,6 +200,80 @@ const Schedule = () => {
             <Plus className="h-4 w-4" />
             Plan Workout
           </Button>
+          <Dialog open={showExerciseDialog} onOpenChange={setShowExerciseDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2" title="Quick add exercises to a new planned session for this date">
+                <Play className="h-4 w-4" /> Quick Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Search className="h-4 w-4" /> Select Exercises {selectedExerciseIds.size > 0 && (<span className="text-xs font-normal text-muted-foreground">({selectedExerciseIds.size} selected)</span>)}</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                <div className="relative flex-1">
+                  <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search exercises..."
+                    value={exerciseSearch}
+                    onChange={e => setExerciseSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={muscleFilter} onValueChange={setMuscleFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Muscle Group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {uniqueMuscleGroups.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="border rounded-md h-[380px] overflow-auto p-2 space-y-2 bg-muted/40">
+                {exercisesLoading && (
+                  <div className="text-sm text-muted-foreground p-4">Loading exercises...</div>
+                )}
+                {!exercisesLoading && filteredExercises.length === 0 && (
+                  <div className="text-sm text-muted-foreground p-4">No exercises match your search.</div>
+                )}
+                {!exercisesLoading && filteredExercises.map(ex => {
+                  const selected = selectedExerciseIds.has(ex.exercise_id);
+                  return (
+                    <button
+                      type="button"
+                      key={ex.exercise_id}
+                      onClick={() => toggleExerciseSelect(ex.exercise_id)}
+                      className={`w-full text-left p-3 rounded-md border flex flex-col gap-1 transition-smooth ${selected ? 'bg-gradient-primary text-white shadow-glow border-primary' : 'bg-background hover:bg-muted'} focus:outline-none focus:ring-2 focus:ring-ring`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-sm">{ex.name}</span>
+                        {selected && <span className="text-xs font-semibold uppercase tracking-wide">Selected</span>}
+                      </div>
+                      {ex.muscle_group && (
+                        <div className="flex flex-wrap gap-1">
+                          {ex.muscle_group.split(',').map(g => (
+                            <Badge key={g.trim()} variant="secondary" className="text-[10px] px-1 py-0">{g.trim()}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <DialogFooter className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+                <div className="text-xs text-muted-foreground">{selectedExerciseIds.size === 0 ? 'No exercises selected yet' : `${selectedExerciseIds.size} exercise${selectedExerciseIds.size>1?'s':''} ready • New session on ${selectedDate.toLocaleDateString()}`}</div>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <Button type="button" variant="outline" className="flex-1 md:flex-none" onClick={() => { setSelectedExerciseIds(new Set()); }}>Clear</Button>
+                  <Button type="button" disabled={createWorkoutMutation.isPending || bulkCreateLogs.isPending || selectedExerciseIds.size===0} onClick={handleAddSelectedExercises} className="flex-1 md:flex-none">
+                    {createWorkoutMutation.isPending || bulkCreateLogs.isPending ? 'Saving...' : 'Add Selected'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -224,16 +359,7 @@ const Schedule = () => {
                     <CheckSquare className="h-4 w-4" />
                     {workout.status === 'Done' ? 'Done' : 'Mark Done'}
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="flex items-center gap-2"
-                    title="Edit workout details, exercises, and schedule"
-                    onClick={() => navigate(`/dashboard/workout/plan?session=${workout.session_id}`)}
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit Plan
-                  </Button>
+
                   <Button 
                     size="sm" 
                     variant="outline" 
@@ -303,9 +429,7 @@ const Schedule = () => {
                       >
                         <CheckSquare className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/workout/plan?session=${w.session_id}`)} title="Edit plan">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+
                       <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive hover:text-white" onClick={() => handleDeleteWorkout(w.session_id, w.title || 'Untitled Workout')} title="Delete">
                         <Trash2 className="h-4 w-4" />
                       </Button>
