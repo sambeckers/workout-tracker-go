@@ -426,15 +426,15 @@ const Settings = () => {
                   variant={currentPalette === key ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setPalette(key)}
-                  className="flex flex-col items-start p-4 h-auto text-left relative overflow-hidden"
+                  className="flex flex-col items-start p-4 h-auto min-h-[96px] text-left relative overflow-hidden rounded-md gap-1"
                 >
-                  <div 
-                    className="absolute inset-0 opacity-20"
+                  <div
+                    className="absolute inset-0 opacity-15 pointer-events-none"
                     style={{ background: palette.colors.gradientHero }}
                   />
-                  <div className="relative z-10">
-                    <div className="font-medium">{palette.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                  <div className="relative z-10 w-full flex flex-col">
+                    <div className="font-medium text-sm leading-tight break-words line-clamp-[3]">{palette.name}</div>
+                    <div className="text-[11px] text-muted-foreground leading-snug mt-0.5 break-words">
                       {palette.description}
                     </div>
                   </div>
@@ -468,13 +468,13 @@ const Settings = () => {
                         variant={currentFont === key ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setFont(key)}
-                        className="flex items-start justify-start gap-2 p-3 h-auto text-left"
+                        className="flex items-start justify-start gap-2 p-3 h-auto min-h-[80px] text-left rounded-md"
                         style={{ fontFamily: font.css }}
                       >
                         <Type className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm">{font.name}</div>
-                          <div className="text-xs text-muted-foreground line-clamp-2">
+                        <div className="min-w-0 flex-1 flex flex-col gap-1">
+                          <div className="font-medium text-sm leading-tight break-words">{font.name}</div>
+                          <div className="text-[11px] text-muted-foreground leading-snug break-words">
                             {font.description}
                           </div>
                         </div>

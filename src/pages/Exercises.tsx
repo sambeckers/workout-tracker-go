@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // keep for difficulty select
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Search, Filter, Plus, Pencil, ChevronDown, Dumbbell } from 'lucide-react';
 import { useExercises, useUpdateExercise } from '@/hooks/useWorkoutData';
@@ -197,6 +199,32 @@ const formatMuscleGroups = (muscleGroup: string): string[] => {
   return muscleGroup.split(',').map(g => g.trim()).filter(Boolean);
 };
 
+// Color classes per muscle group root keyword
+const GROUP_COLOR_MAP: Record<string, string> = {
+  Chest: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+  Back: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200',
+  Lats: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200',
+  Shoulders: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+  Legs: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+  Glutes: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-200',
+  Arms: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
+  Biceps: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
+  Triceps: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200',
+  Core: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200',
+  Abs: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200',
+  Cardio: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+  Conditioning: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+  Sports: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
+  Machine: 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200',
+  Cable: 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200',
+  Various: 'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-200'
+};
+
+const badgeColorForGroup = (g: string) => {
+  const key = Object.keys(GROUP_COLOR_MAP).find(k => g.toLowerCase().includes(k.toLowerCase()));
+  return key ? GROUP_COLOR_MAP[key] : GROUP_COLOR_MAP['Various'];
+};
+
 const getFirstMuscleGroup = (muscleGroup: string): string => {
   const groups = formatMuscleGroups(muscleGroup);
   return groups[0] || muscleGroup;
@@ -331,8 +359,17 @@ const Exercises = () => {
   });
 
   const openEditExercise = (exercise: any) => {
+    // Preserve ALL existing muscle groups (comma-separated) instead of collapsing to first
+    const raw = exercise.muscle_group || '';
+    // Split, trim, filter to only valid known categories to avoid showing stale/removed groups
+    const allValid = raw
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .filter((g: string) => categories.some(c => c.name.toLowerCase() === g.toLowerCase()));
+    const normalized = allValid.join(',');
     setEditForm({
-      muscle_group: normalizeToAvailableCategory(exercise.muscle_group || '', categories),
+      muscle_group: normalized,
       equipment: exercise.equipment || '',
       description: exercise.description || '',
       difficulty: exercise.difficulty || 'Beginner'
@@ -342,34 +379,34 @@ const Exercises = () => {
 
   const handleCreate = async () => {
     if (!form.name.trim()) return;
-    const { error } = await supabase.from('exercises').insert({
+    // Persist groups as comma-separated string (or null if none)
+    const muscle_group = createGroups.length ? joinGroups(createGroups) : null;
+    const { data: created, error } = await supabase.from('exercises').insert({
       name: form.name.trim(),
-      muscle_group: (form.muscle_group && form.muscle_group !== 'none') ? form.muscle_group : null,
+      muscle_group,
       description: form.description || null,
       equipment: form.equipment || null,
       difficulty: form.difficulty || null
-    });
+    }).select('exercise_id, muscle_group').single();
     if (error) {
       toast.error('Failed to create exercise');
       console.error('[Exercises] Create failed', error);
     } else {
+      if (created?.exercise_id) await syncExerciseGroups(created.exercise_id, createGroups);
       toast.success('Exercise created');
       setCreateOpen(false);
       setForm({ name: '', muscle_group: '', description: '', equipment: '', difficulty: 'Beginner' });
+      setCreateGroups([]);
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
     }
   };
 
   const handleUpdateExercise = async () => {
     if (!editExerciseOpen) return;
-
-    const isNone = editForm.muscle_group === 'none';
-    const isValid = categories.some(cat => cat.name === editForm.muscle_group);
-    const cleanMuscleGroup = isNone || !isValid ? '' : editForm.muscle_group;
-
+    const newMuscleGroupStr = editGroups.length ? joinGroups(editGroups) : null;
     const updateData: any = {};
-    if (cleanMuscleGroup !== editExerciseOpen.muscle_group) {
-      updateData.muscle_group = cleanMuscleGroup || null;
+    if (newMuscleGroupStr !== editExerciseOpen.muscle_group) {
+      updateData.muscle_group = newMuscleGroupStr;
     }
     if (editForm.equipment !== editExerciseOpen.equipment) {
       updateData.equipment = editForm.equipment || null;
@@ -396,6 +433,7 @@ const Exercises = () => {
         exerciseId: editExerciseOpen.exercise_id,
         data: updateData,
       });
+      await syncExerciseGroups(editExerciseOpen.exercise_id, editGroups);
       setEditExerciseOpen(null);
     } catch (err) {
       // Error toast already shown in mutation onError; keep dialog open for correction
@@ -561,6 +599,72 @@ const Exercises = () => {
     run();
   }, [isLoading, exercises]);
 
+  // Helpers for multi muscle group support (stored as comma-separated string)
+  // parseGroups: splits on ',', trims whitespace, filters empties, de-dupes case-insensitively while preserving first casing
+  const parseGroups = (val?: string | null) => {
+    if (!val) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of val.split(',')) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+    return out;
+  };
+  const joinGroups = (arr: string[]) => arr.join(',');
+
+  const [createGroups, setCreateGroups] = useState<string[]>(() => parseGroups(form.muscle_group));
+  const [editGroups, setEditGroups] = useState<string[]>(() => parseGroups(editForm.muscle_group));
+  const [groupSearchCreate, setGroupSearchCreate] = useState('');
+  const [groupSearchEdit, setGroupSearchEdit] = useState('');
+
+  const filteredCreateCats = useMemo(() => {
+    const q = groupSearchCreate.toLowerCase();
+    return sortedCategories.filter(c => c.name.toLowerCase().includes(q));
+  }, [groupSearchCreate, sortedCategories]);
+
+  const filteredEditCats = useMemo(() => {
+    const q = groupSearchEdit.toLowerCase();
+    return sortedCategories.filter(c => c.name.toLowerCase().includes(q));
+  }, [groupSearchEdit, sortedCategories]);
+
+  useEffect(() => { setCreateGroups(parseGroups(form.muscle_group)); }, [form.muscle_group]);
+  useEffect(() => { setEditGroups(parseGroups(editForm.muscle_group)); }, [editForm.muscle_group]);
+
+  const toggleGroup = (current: string[], setFn: (v: string[]) => void, g: string) => {
+    setFn(current.includes(g) ? current.filter(x => x !== g) : [...current, g]);
+  };
+
+  // Helper to sync normalized join table (ignores errors if migration not applied yet)
+  const syncExerciseGroups = async (exerciseId: string, groups: string[]) => {
+    const client: any = supabase;
+    try {
+      await client.from('exercise_muscle_groups').delete().eq('exercise_id', exerciseId);
+      if (groups.length) {
+        await client.from('exercise_muscle_groups').insert(
+          groups.map(g => ({ exercise_id: exerciseId, muscle_group: g }))
+        );
+      }
+    } catch (e: any) {
+      if (e?.message?.includes('exercise_muscle_groups')) {
+        console.warn('[Exercises] Join table missing (migration pending)');
+      } else {
+        console.warn('[Exercises] Failed to sync exercise groups', e);
+      }
+    }
+  };
+
+  const MultiSelectDisplay: React.FC<{ selected: string[]; placeholder: string }> = ({ selected, placeholder }) => {
+    if (!selected.length) return <span className="text-muted-foreground">{placeholder}</span>;
+    return <span className="flex flex-wrap gap-1 max-h-10 overflow-y-auto">{selected.map(g => (
+      <span key={g} className={`px-2 py-0.5 rounded text-xs font-medium border ${badgeColorForGroup(g)}`}>{g}</span>
+    ))}</span>;
+  };
+
   return (
   <div className="app-container p-8 space-y-8">
       {/* Header */}
@@ -587,20 +691,59 @@ const Exercises = () => {
                 <Input id="ex-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="ex-muscle">Muscle Group</Label>
-                <Select value={form.muscle_group || 'none'} onValueChange={(v) => setForm(f => ({ ...f, muscle_group: v }))}>
-                  <SelectTrigger id="ex-muscle">
-                    <SelectValue placeholder="Select muscle group" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60 overflow-y-auto">
-                    <SelectItem value="none">None</SelectItem>
-                    {sortedCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="ex-muscle">Muscle Groups</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" id="ex-muscle" className="justify-start h-10 w-full">
+                      <MultiSelectDisplay selected={createGroups} placeholder="Select muscle groups" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2 max-h-80" align="start">
+                      <div className="mb-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Select one or more</span>
+                          {createGroups.length > 0 && (
+                            <button
+                              className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                              onClick={() => setCreateGroups([])}
+                            >Clear</button>
+                          )}
+                        </div>
+                        <Input
+                          placeholder="Search groups..."
+                          className="h-8 text-xs"
+                          onChange={e => setGroupSearchCreate(e.target.value)}
+                          value={groupSearchCreate}
+                        />
+                      </div>
+                      <div className="relative">
+                        <div
+                          className="space-y-1 overflow-y-auto max-h-56 pr-1"
+                          onWheel={(e) => { e.stopPropagation(); }}
+                          role="listbox"
+                          aria-label="Muscle groups list"
+                        >
+                          {filteredCreateCats.map(cat => {
+                            const checked = createGroups.includes(cat.name);
+                            return (
+                              <label key={cat.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted cursor-pointer text-sm select-none">
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={() => toggleGroup(createGroups, setCreateGroups, cat.name)}
+                                  className="h-4 w-4"
+                                />
+                                <span className="flex-1 truncate">{cat.name}</span>
+                                {checked && <span className="text-[10px] text-muted-foreground">✓</span>}
+                              </label>
+                            );
+                          })}
+                          {!filteredCreateCats.length && (
+                            <div className="text-center text-xs text-muted-foreground py-4">No matches</div>
+                          )}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                </Popover>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="ex-desc">Description</Label>
@@ -765,7 +908,7 @@ const Exercises = () => {
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {groups.map((group, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-xs">
+                                    <Badge key={idx} variant="outline" className={`text-xs border ${badgeColorForGroup(group)}`}>
                                       {group}
                                     </Badge>
                                   ))}
@@ -961,27 +1104,59 @@ const Exercises = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="edit-muscle-group">Muscle Group</Label>
-              <div className="space-y-2">
-                <Select 
-                  value={editForm.muscle_group}
-                  onValueChange={(value) => setEditForm({ ...editForm, muscle_group: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select muscle group" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60 overflow-y-auto">
-                    <SelectItem value="none">None</SelectItem>
-                    {sortedCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                    {/* Custom option removed */}
-                  </SelectContent>
-                </Select>
-                {/* Free-text input removed; restrict to predefined categories */}
-              </div>
+              <Label htmlFor="edit-muscle-group">Muscle Groups</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" id="edit-muscle-group" className="justify-start h-10 w-full">
+                    <MultiSelectDisplay selected={editGroups} placeholder="Select muscle groups" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 max-h-80" align="start">
+                  <div className="mb-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Select one or more</span>
+                      {editGroups.length > 0 && (
+                        <button
+                          className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                          onClick={() => setEditGroups([])}
+                        >Clear</button>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Search groups..."
+                      className="h-8 text-xs"
+                      onChange={e => setGroupSearchEdit(e.target.value)}
+                      value={groupSearchEdit}
+                    />
+                  </div>
+                  <div className="relative">
+                    <div
+                      className="space-y-1 overflow-y-auto max-h-56 pr-1"
+                      onWheel={(e) => { e.stopPropagation(); }}
+                      role="listbox"
+                      aria-label="Muscle groups list"
+                    >
+                      {filteredEditCats.map(cat => {
+                        const checked = editGroups.includes(cat.name);
+                        return (
+                          <label key={cat.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted cursor-pointer text-sm select-none">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => toggleGroup(editGroups, setEditGroups, cat.name)}
+                              className="h-4 w-4"
+                            />
+                            <span className="flex-1 truncate">{cat.name}</span>
+                            {checked && <span className="text-[10px] text-muted-foreground">✓</span>}
+                          </label>
+                        );
+                      })}
+                      {!filteredEditCats.length && (
+                        <div className="text-center text-xs text-muted-foreground py-4">No matches</div>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             
             <div>
