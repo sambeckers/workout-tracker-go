@@ -159,6 +159,22 @@ const WorkoutSession = () => {
     }
   }, [exercises, currentWorkout, autoSave.debouncedSaveExerciseLogs]);
 
+  // Auto-save metadata when changed
+  const autoSaveMetadata = useCallback((field: string, value: string) => {
+    if (!currentWorkout) return;
+    
+    const cleaned = {
+      [field]: value.trim() || null,
+    };
+
+    const oldVal = (currentWorkout as any)[field] ?? null;
+    if (cleaned[field] !== oldVal) {
+      markChangesAndAutoSave(() => {
+        autoSave.debouncedSaveSession(currentWorkout.session_id, cleaned);
+      });
+    }
+  }, [currentWorkout, autoSave.debouncedSaveSession, markChangesAndAutoSave]);
+
   // Trigger autosave when exercises change
   useEffect(() => {
     if (currentWorkout && exercises.length > 0 && hasUnsavedChanges) {
@@ -348,16 +364,12 @@ const WorkoutSession = () => {
               )}
               {currentWorkout && editingMeta && (
                 <div className="space-y-3">
-                  <div className="grid gap-1"><label className="text-xs font-medium">Title</label><Input value={metaDraft.title} onChange={e=>setMetaDraft(d=>({...d,title:e.target.value}))} placeholder="Workout title" /></div>
+                  <div className="grid gap-1"><label className="text-xs font-medium">Title</label><Input value={metaDraft.title} onChange={e=>{setMetaDraft(d=>({...d,title:e.target.value})); autoSaveMetadata('title', e.target.value);}} placeholder="Workout title" /></div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1"><label className="text-xs font-medium">Date</label><Input type="date" value={metaDraft.date} onChange={e=>setMetaDraft(d=>({...d,date:e.target.value}))} /></div>
-                    <div className="grid gap-1"><label className="text-xs font-medium">Time</label><Input type="time" value={metaDraft.time} onChange={e=>setMetaDraft(d=>({...d,time:e.target.value}))} /></div>
+                    <div className="grid gap-1"><label className="text-xs font-medium">Date</label><Input type="date" value={metaDraft.date} onChange={e=>{setMetaDraft(d=>({...d,date:e.target.value})); autoSaveMetadata('date', e.target.value);}} /></div>
+                    <div className="grid gap-1"><label className="text-xs font-medium">Time</label><Input type="time" value={metaDraft.time} onChange={e=>{setMetaDraft(d=>({...d,time:e.target.value})); autoSaveMetadata('time', e.target.value);}} /></div>
                   </div>
-                  <div className="grid gap-1"><label className="text-xs font-medium">Notes</label><textarea value={metaDraft.notes} onChange={e=>setMetaDraft(d=>({...d,notes:e.target.value}))} className="w-full text-xs rounded-md border bg-background p-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Session notes / goals / feelings..." /></div>
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <Button size="sm" variant="outline" onClick={()=>{ setEditingMeta(false); setMetaDraft({ title: currentWorkout.title||'', date: currentWorkout.date||'', time: currentWorkout.time||'', notes:(currentWorkout as any)?.notes||'' }); }}>Cancel</Button>
-                    <Button size="sm" onClick={handleSaveMeta} disabled={updateSession.isPending}>{updateSession.isPending?'Saving...':'Save'}</Button>
-                  </div>
+                  <div className="grid gap-1"><label className="text-xs font-medium">Notes</label><textarea value={metaDraft.notes} onChange={e=>{setMetaDraft(d=>({...d,notes:e.target.value})); autoSaveMetadata('notes', e.target.value);}} className="w-full text-xs rounded-md border bg-background p-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Session notes / goals / feelings..." /></div>
                 </div>
               )}
             </CardContent>
