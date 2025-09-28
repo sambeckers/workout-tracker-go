@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Play, Pause, Check, Timer, Dumbbell, Save, Minus, CheckSquare, Star, Edit, X as XIcon, GripVertical } from 'lucide-react';
+import { ArrowLeft, Plus, Play, Pause, Check, Timer, Dumbbell, Save, Minus, CheckSquare, Star, Edit, X as XIcon, GripVertical, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession } from '@/hooks/useWorkoutData';
@@ -48,9 +48,12 @@ const WorkoutSession = () => {
   const autoSave = useAutoSave({
     delay: 1500,
     onSuccess: () => {
-      // Optional: could show a subtle success indicator
+      setSaveState('saved');
+      setHasUnsavedChanges(false);
+      setTimeout(() => setSaveState('idle'), 2000); // Show saved state for 2 seconds
     },
     onError: (error) => {
+      setSaveState('idle');
       toast.error('Auto-save failed');
     }
   });
@@ -65,6 +68,10 @@ const WorkoutSession = () => {
   const [favoriteExercises,setFavoriteExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('favorite-exercises')||'[]'); } catch { return []; } });
   const [recentExercises,setRecentExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('recent-exercises')||'[]'); } catch { return []; } });
   const autoMarkedDoneRef = useRef(false);
+  
+  // Auto-save state tracking
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Metadata edit state
   const [editingMeta,setEditingMeta] = useState(false);
@@ -83,14 +90,23 @@ const WorkoutSession = () => {
   const createSessionIfNeeded = async ()=>{ if(id!=='new') return; if(createSession.isPending) return; try { const now=new Date(); const date=now.toISOString().slice(0,10); const time=now.toTimeString().slice(0,5); const session=await createSession.mutateAsync({ date,time,status:'Planned' }); navigate(`/workout/${session.session_id}`); } catch { toast.error('Failed to create session'); } };
   useEffect(()=>{ if(id==='new' && !currentWorkout && !createSession.isPending) createSessionIfNeeded(); }, [id,currentWorkout]);
 
+  // Helper to mark changes and trigger auto-save
+  const markChangesAndAutoSave = useCallback((saveFunction: () => void) => {
+    setHasUnsavedChanges(true);
+    setSaveState('saving');
+    saveFunction();
+  }, []);
+
   // Auto-save session duration
   useEffect(() => {
-    if (currentWorkout && duration > 0) {
-      autoSave.debouncedSaveSession(currentWorkout.session_id, { 
-        duration_minutes: Math.floor(duration / 60) 
+    if (currentWorkout && duration > 0 && hasUnsavedChanges) {
+      markChangesAndAutoSave(() => {
+        autoSave.debouncedSaveSession(currentWorkout.session_id, { 
+          duration_minutes: Math.floor(duration / 60) 
+        });
       });
     }
-  }, [duration, currentWorkout?.session_id, autoSave.debouncedSaveSession]);
+  }, [duration, currentWorkout?.session_id, autoSave.debouncedSaveSession, hasUnsavedChanges, markChangesAndAutoSave]);
 
   // Auto-save exercise logs when exercises change
   const autoSaveExerciseLogs = useCallback(() => {
@@ -138,31 +154,33 @@ const WorkoutSession = () => {
     }).filter(Boolean);
 
     if (logs.length > 0) {
+      setSaveState('saving');
       autoSave.debouncedSaveExerciseLogs(logs);
     }
   }, [exercises, currentWorkout, autoSave.debouncedSaveExerciseLogs]);
 
   // Trigger autosave when exercises change
   useEffect(() => {
-    if (currentWorkout && exercises.length > 0) {
+    if (currentWorkout && exercises.length > 0 && hasUnsavedChanges) {
       autoSaveExerciseLogs();
     }
-  }, [exercises, autoSaveExerciseLogs]);
+  }, [exercises, autoSaveExerciseLogs, hasUnsavedChanges]);
 
   // Timer
-  useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>setDuration(d=>d+1),1000); return ()=>clearInterval(int); }, [isActive]);
-  const toggleSet=(eid:string,idx:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,completed:!s.completed}:s)}:ex));
-  const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));
-  const toggleMode=(eid:string)=>setExercises(p=>p.map(ex=>ex.id===eid?((ex.mode||'sets')==='sets'?{...ex,mode:'time',durationSeconds:ex.durationSeconds||60,timeCompleted:false}:{...ex,mode:'sets',sets:ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s}))}):ex));
-  const updateDuration=(eid:string,val:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));
-  const toggleEnableField=(eid:string,f:'enableReps'|'enableWeight')=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,[f]:!ex[f]}:ex));
-  const setTimeCompleted=(eid:string,done:boolean)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));
-  const toggleAdvanced=(eid:string)=>setExercises(p=>p.map(ex=>ex.id===eid?(()=>{ const adv=!ex.advanced; localStorage.setItem(`exercise-mode-${ex.id}`, adv?'advanced':'compact'); return {...ex,advanced:adv}; })():ex));
-  const updateAllSets=(eid:string,field:'reps'|'weight',val:number)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,[field]:val}))}:ex));
-  const setAllSetsCompletion=(eid:string,done:boolean)=>setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,completed:done}))}:ex));
+  useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>{setDuration(d=>d+1); setHasUnsavedChanges(true);},1000); return ()=>clearInterval(int); }, [isActive]);
+  const toggleSet=(eid:string,idx:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,completed:!s.completed}:s)}:ex));};
+  const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));};
+  const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?((ex.mode||'sets')==='sets'?{...ex,mode:'time',durationSeconds:ex.durationSeconds||60,timeCompleted:false}:{...ex,mode:'sets',sets:ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s}))}):ex));};
+  const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));};
+  const toggleEnableField=(eid:string,f:'enableReps'|'enableWeight')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,[f]:!ex[f]}:ex));};
+  const setTimeCompleted=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));};
+  const toggleAdvanced=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?(()=>{ const adv=!ex.advanced; localStorage.setItem(`exercise-mode-${ex.id}`, adv?'advanced':'compact'); return {...ex,advanced:adv}; })():ex));};
+  const updateAllSets=(eid:string,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,[field]:val}))}:ex));};
+  const setAllSetsCompletion=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,completed:done}))}:ex));};
 
   // Delete exercise with autosave
   const deleteExercise = (exerciseId: string) => {
+    setHasUnsavedChanges(true);
     setExercises(prev => prev.filter(ex => ex.id !== exerciseId));
     toast.success('Exercise removed');
     // Autosave will be triggered by the useEffect that watches exercises
@@ -176,6 +194,7 @@ const WorkoutSession = () => {
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
     
+    setHasUnsavedChanges(true);
     setExercises(items);
     // Autosave will be triggered by the useEffect that watches exercises
   };
@@ -205,6 +224,8 @@ const WorkoutSession = () => {
       return;
     }
 
+    setHasUnsavedChanges(true);
+
     // Optimistic update: snapshot previous sessions
     const queryKey = ['workout-sessions', (sessions[0] && sessions[0].user_id)];
     const previous = queryClient.getQueryData<any>(queryKey);
@@ -231,7 +252,7 @@ const WorkoutSession = () => {
   };
 
   // Add exercise
-  const addExercise=(exercise:any)=>{ const isTime=(exercise.muscle_group||'').toLowerCase().includes('full'); const newEx:ExerciseWithSets={ id:exercise.exercise_id, name:exercise.name, sets:isTime?[]:DEFAULT_SETS.map(s=>({...s})), mode:isTime?'time':'sets', advanced:false, enableReps:true, enableWeight:true, durationSeconds:isTime?60:undefined, timeCompleted:false }; setExercises(p=>[...p,newEx]); setRecentExercises(prev=>{ const up=[newEx.id,...prev.filter(i=>i!==newEx.id)].slice(0,15); localStorage.setItem('recent-exercises', JSON.stringify(up)); return up; }); };
+  const addExercise=(exercise:any)=>{ const isTime=(exercise.muscle_group||'').toLowerCase().includes('full'); const newEx:ExerciseWithSets={ id:exercise.exercise_id, name:exercise.name, sets:isTime?[]:DEFAULT_SETS.map(s=>({...s})), mode:isTime?'time':'sets', advanced:false, enableReps:true, enableWeight:true, durationSeconds:isTime?60:undefined, timeCompleted:false }; setHasUnsavedChanges(true); setExercises(p=>[...p,newEx]); setRecentExercises(prev=>{ const up=[newEx.id,...prev.filter(i=>i!==newEx.id)].slice(0,15); localStorage.setItem('recent-exercises', JSON.stringify(up)); return up; }); };
   const toggleFavoriteExercise=(exerciseId:string)=>setFavoriteExercises(prev=>{ const up = prev.includes(exerciseId)?prev.filter(i=>i!==exerciseId):[...prev,exerciseId]; localStorage.setItem('favorite-exercises', JSON.stringify(up)); return up; });
 
   // Save workout logs
@@ -263,11 +284,17 @@ const WorkoutSession = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={saveWorkout}><Save className="h-4 w-4" />Save</Button>
-          {autoSave.isAutoSaving && (
-            <div className="w-6 h-6 flex items-center justify-center" title="Auto-saving...">
-              <div className="animate-spin h-3 w-3 border border-gray-300 border-t-gray-600 rounded-full"></div>
-            </div>
-          )}
+          <div className="w-6 h-6 flex items-center justify-center" title={
+            saveState === 'saving' ? 'Auto-saving...' : 
+            saveState === 'saved' ? 'All changes saved' : 
+            hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'
+          }>
+            <Cloud className={`h-4 w-4 ${
+              saveState === 'saving' ? 'animate-pulse text-blue-500' :
+              saveState === 'saved' ? 'text-green-500' :
+              hasUnsavedChanges ? 'text-yellow-500' : 'text-muted-foreground'
+            }`} />
+          </div>
           {currentWorkout && (
             <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={updateSession.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
               <CheckSquare className="h-4 w-4" />{currentWorkout.status==='Done'?'Done':'Mark Done'}
