@@ -314,6 +314,12 @@ const Exercises = () => {
     description: '',
     difficulty: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced'
   });
+  const [metricFlags, setMetricFlags] = useState({
+    metric_weight: true,
+    metric_reps: true,
+    metric_time: false,
+    metric_distance: false,
+  });
 
   // Categories are fixed; no local persistence or editing
 
@@ -417,6 +423,12 @@ const Exercises = () => {
     if (editForm.difficulty !== editExerciseOpen.difficulty) {
       updateData.difficulty = editForm.difficulty || null;
     }
+    // Metric flags: only include changed ones
+    ['metric_weight','metric_reps','metric_time','metric_distance'].forEach(key => {
+      if ((editExerciseOpen as any)[key] !== (metricFlags as any)[key]) {
+        updateData[key] = (metricFlags as any)[key];
+      }
+    });
 
     if (Object.keys(updateData).length === 0) {
       toast.info('No changes to save');
@@ -634,6 +646,17 @@ const Exercises = () => {
 
   useEffect(() => { setCreateGroups(parseGroups(form.muscle_group)); }, [form.muscle_group]);
   useEffect(() => { setEditGroups(parseGroups(editForm.muscle_group)); }, [editForm.muscle_group]);
+  // When opening edit dialog, initialize metric flags from exercise (fallback defaults already inferred in hook)
+  useEffect(() => {
+    if (editExerciseOpen) {
+      setMetricFlags({
+        metric_weight: editExerciseOpen.metric_weight !== false,
+        metric_reps: editExerciseOpen.metric_reps !== false,
+        metric_time: !!editExerciseOpen.metric_time,
+        metric_distance: !!editExerciseOpen.metric_distance,
+      });
+    }
+  }, [editExerciseOpen]);
 
   const toggleGroup = (current: string[], setFn: (v: string[]) => void, g: string) => {
     setFn(current.includes(g) ? current.filter(x => x !== g) : [...current, g]);
@@ -749,19 +772,9 @@ const Exercises = () => {
                 <Label htmlFor="ex-desc">Description</Label>
                 <Input id="ex-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
               </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="ex-equip">Equipment</Label>
-                  <Input id="ex-equip" value={form.equipment} onChange={e => setForm(f => ({ ...f, equipment: e.target.value }))} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="ex-diff">Difficulty</Label>
-                  <select id="ex-diff" className="border rounded-md h-9 px-2 bg-background" value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: e.target.value }))}>
-                    <option>Beginner</option>
-                    <option>Intermediate</option>
-                    <option>Advanced</option>
-                  </select>
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ex-equip">Equipment</Label>
+                <Input id="ex-equip" value={form.equipment} onChange={e => setForm(f => ({ ...f, equipment: e.target.value }))} />
               </div>
             </div>
             <DialogFooter>
@@ -881,11 +894,7 @@ const Exercises = () => {
                       <CardTitle className="text-lg truncate max-w-full">
                         {exercise.name}
                       </CardTitle>
-                      {exercise.difficulty && (
-                        <Badge className={`${getDifficultyColor(exercise.difficulty)} w-max`}>
-                          {exercise.difficulty}
-                        </Badge>
-                      )}
+                      {/* Difficulty removed */}
                     </CardHeader>
                     <CardContent className="pt-0 flex flex-col flex-1">
                       <CardDescription className="mb-4 line-clamp-3">
@@ -906,9 +915,14 @@ const Exercises = () => {
                                 return <span>{getDisplayGroup(exercise)}</span>;
                               }
                               return (
-                                <div className="flex flex-wrap gap-1">
+                                <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pr-1">
                                   {groups.map((group, idx) => (
-                                    <Badge key={idx} variant="outline" className={`text-xs border ${badgeColorForGroup(group)}`}>
+                                    <Badge
+                                      key={idx}
+                                      variant="outline"
+                                      className={`text-[10px] leading-tight border ${badgeColorForGroup(group)} max-w-[110px] truncate`}
+                                      title={group}
+                                    >
                                       {group}
                                     </Badge>
                                   ))}
@@ -1019,16 +1033,7 @@ const Exercises = () => {
                     <Label className="text-sm font-medium text-muted-foreground">Equipment</Label>
                     <p className="text-base">{getDisplayEquipment(viewDetailsOpen)}</p>
                   </div>
-                  {viewDetailsOpen.difficulty && (
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Difficulty</Label>
-                      <div className="mt-1">
-                        <Badge className={`${getDifficultyColor(viewDetailsOpen.difficulty)}`}>
-                          {viewDetailsOpen.difficulty}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
+                  {/* Difficulty removed */}
                 </div>
                 
                 {/* Quick Actions */}
@@ -1085,6 +1090,24 @@ const Exercises = () => {
                   <div>
                     <span className="font-medium">Exercise ID:</span>
                     <span className="ml-2 font-mono text-xs">{viewDetailsOpen.exercise_id}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="font-medium">Metrics:</span>
+                    <span className="ml-2 inline-flex flex-wrap gap-1 items-center">
+                      {(() => {
+                        const metrics: string[] = [];
+                        if (viewDetailsOpen.metric_time) metrics.push('Time');
+                        if (viewDetailsOpen.metric_distance) metrics.push('Distance');
+                        if (viewDetailsOpen.metric_reps !== false) metrics.push('Reps');
+                        if (viewDetailsOpen.metric_weight !== false) metrics.push('Weight');
+                        if (!metrics.length) return <span className="text-muted-foreground">None</span>;
+                        return metrics.map(m => (
+                          <Badge key={m} variant="outline" className="text-[10px] px-1 py-0">
+                            {m}
+                          </Badge>
+                        ));
+                      })()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1177,6 +1200,53 @@ const Exercises = () => {
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 placeholder="Brief description of the exercise"
               />
+            </div>
+
+            <div>
+              <Label>Metrics</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={metricFlags.metric_weight}
+                    onCheckedChange={() => setMetricFlags(f => ({ ...f, metric_weight: !f.metric_weight }))}
+                    className="h-4 w-4"
+                  />
+                  Weight
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={metricFlags.metric_reps}
+                    onCheckedChange={() => setMetricFlags(f => ({ ...f, metric_reps: !f.metric_reps }))}
+                    className="h-4 w-4"
+                  />
+                  Reps/Sets
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={metricFlags.metric_time}
+                    onCheckedChange={() => setMetricFlags(f => {
+                      const enabling = !f.metric_time;
+                      if (enabling) {
+                        return { ...f, metric_time: true, metric_distance: f.metric_distance, metric_weight: false, metric_reps: false };
+                      } else {
+                        return { ...f, metric_time: false, metric_distance: false };
+                      }
+                    })}
+                    className="h-4 w-4"
+                  />
+                  Time
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-muted-foreground">
+                  <Checkbox
+                    checked={metricFlags.metric_distance}
+                    disabled={!metricFlags.metric_time}
+                    onCheckedChange={() => setMetricFlags(f => ({ ...f, metric_distance: !f.metric_distance }))}
+                    className="h-4 w-4"
+                  />
+                  Distance
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">Enable only the metrics you plan to log. Distance requires Time.</p>
             </div>
             
             <div>

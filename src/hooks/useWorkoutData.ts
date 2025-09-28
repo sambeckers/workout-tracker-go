@@ -25,6 +25,11 @@ export interface Exercise {
   equipment?: string;
   difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
   created_by?: string;
+  // Metric capability flags (schema fields)
+  metric_weight?: boolean; // uses weight field
+  metric_reps?: boolean;   // uses reps/sets
+  metric_time?: boolean;   // uses duration
+  metric_distance?: boolean; // uses distance_km
   created_at: string;
   updated_at: string;
 }
@@ -100,9 +105,27 @@ export const useExercises = () => {
         .order('name');
       
       if (error) throw error;
-      return data as Exercise[];
+      const list = (data as Exercise[]).map(e => inferExerciseMetrics(e));
+      return list;
     },
   });
+};
+
+// Fallback metric inference if migration not applied to some records
+const inferExerciseMetrics = (e: Exercise): Exercise => {
+  // If flags already present, trust them
+  if (typeof e.metric_weight === 'boolean' || typeof e.metric_time === 'boolean') return e;
+  const n = e.name.toLowerCase();
+  const cardio = /(running|treadmill|rowing|cycling|boxing|crosstraining|padel|tennis|soccer|stairs|yoga|stretch|sauna)/.test(n);
+  const distance = /(running|treadmill|rowing|cycling)/.test(n);
+  const hold = /(plank|dead *hang|deadhang|hold)/.test(n);
+  const kettlebell = /kettlebell/.test(n);
+  let metric_time = false, metric_distance = false, metric_weight = true, metric_reps = true;
+  if (cardio) { metric_time = true; metric_weight = false; metric_reps = false; }
+  if (distance) { metric_distance = true; }
+  if (hold) { metric_time = true; metric_weight = false; metric_reps = false; }
+  if (kettlebell) { /* keep defaults */ }
+  return { ...e, metric_time, metric_distance, metric_weight, metric_reps };
 };
 
 export const useGoals = () => {

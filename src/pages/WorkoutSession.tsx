@@ -19,7 +19,22 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 
 // Local interfaces describing enriched exercise + sets for UI
 interface Set { setNumber:number; reps:number; weight:number; completed:boolean; }
-interface ExerciseWithSets { id:string; name:string; sets:Set[]; advanced?:boolean; mode?:'sets'|'time'; durationSeconds?:number; timeCompleted?:boolean; enableReps?:boolean; enableWeight?:boolean; }
+interface ExerciseWithSets { 
+  id:string; 
+  name:string; 
+  sets:Set[]; 
+  advanced?:boolean; 
+  mode?:'sets'|'time'; 
+  durationSeconds?:number; 
+  timeCompleted?:boolean; 
+  enableReps?:boolean; 
+  enableWeight?:boolean; 
+  metric_time?: boolean; 
+  metric_weight?: boolean; 
+  metric_reps?: boolean; 
+  metric_distance?: boolean; 
+  distanceKm?: number; // captured when distance metric active
+}
 
 const DEFAULT_SETS: Set[] = [
   { setNumber:1, reps:10, weight:0, completed:false },
@@ -81,9 +96,61 @@ const WorkoutSession = () => {
   // Build exercises list (logs -> planned -> new defaults)
   useEffect(()=>{
     if(exerciseLogs.length){
-      const groups = exerciseLogs.reduce((acc,log)=>{ const eid=log.exercise_id; if(!acc[eid]) acc[eid]={ id:eid, name: log.exercise?.name||'Exercise', sets:[], advanced:false, mode: log.duration_seconds && log.sets===null ? 'time':'sets', enableReps:true, enableWeight:true, timeCompleted:false } as ExerciseWithSets; if(log.sets){ const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; const weights=log.weight_per_set?log.weight_per_set.split(',').map(w=>parseInt(w)||0):[]; for(let i=0;i<log.sets;i++){ acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed:false }); } } return acc; }, {} as Record<string,ExerciseWithSets>); setExercises(Object.values(groups)); return; }
+      const groups = exerciseLogs.reduce((acc,log)=>{ 
+        const eid=log.exercise_id; 
+        const base = availableExercises.find(e=>e.exercise_id===eid) as any;
+        const metric_time = base?.metric_time || false;
+        const metric_reps = base?.metric_reps !== false; // default true
+        const metric_weight = base?.metric_weight !== false; // default true
+        if(!acc[eid]) acc[eid]={ 
+          id:eid, 
+          name: log.exercise?.name||base?.name||'Exercise', 
+            sets:[], 
+            advanced:false, 
+            mode: (log.duration_seconds && log.sets===null) || metric_time ? 'time':'sets', 
+            enableReps: metric_reps, 
+            enableWeight: metric_weight, 
+            timeCompleted:false,
+            metric_time, metric_reps, metric_weight, metric_distance: base?.metric_distance||false,
+        } as ExerciseWithSets; 
+        if(log.sets){ 
+          const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; 
+          const weights=log.weight_per_set?log.weight_per_set.split(',').map(w=>parseInt(w)||0):[]; 
+          for(let i=0;i<log.sets;i++){ 
+            acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed:false }); 
+          } 
+        }
+        return acc; 
+      }, {} as Record<string,ExerciseWithSets>); 
+      setExercises(Object.values(groups)); 
+      return; 
+    }
     if(id && id!=='new' && id!=='quick'){ const key=`planned-exercises-${id}`; const raw=localStorage.getItem(key); if(raw){ try { const parsed=JSON.parse(raw); setExercises(parsed.map((ex:any)=>({ id: ex.exercise_id, name: ex.name, sets: Array.from({length: ex.target_sets}, (_,i)=>({ setNumber:i+1, reps: parseInt(ex.target_reps||'10')||10, weight: parseInt(ex.target_weight||'0')||0, completed:false })), advanced: localStorage.getItem(`exercise-mode-${ex.exercise_id}`)==='advanced', mode:'sets', enableReps:true, enableWeight:true, timeCompleted:false }))); localStorage.removeItem(key); } catch(e){ console.error('Failed to parse planned exercises', e); } } return; }
-    if(id==='new'){ const exerciseId=searchParams.get('exerciseId'); if(exerciseId && availableExercises.length){ const base=availableExercises.find(e=>e.exercise_id===exerciseId); if(base){ const isTime=(base.muscle_group||'').toLowerCase().includes('full'); setExercises([{ id:base.exercise_id, name:base.name, sets:isTime?[]:DEFAULT_SETS.map(s=>({...s})), mode:isTime?'time':'sets', advanced:false, enableReps:true, enableWeight:true, durationSeconds:isTime?60:undefined, timeCompleted:false }]); return; } } setExercises([{ id:availableExercises[0]?.exercise_id||'temp-1', name:availableExercises[0]?.name||'Push-ups', sets:DEFAULT_SETS.map(s=>({...s})), mode:'sets', advanced:false, enableReps:true, enableWeight:true, timeCompleted:false }]); }
+    if(id==='new'){ 
+      const exerciseId=searchParams.get('exerciseId'); 
+      const pick = exerciseId? availableExercises.find(e=>e.exercise_id===exerciseId) : availableExercises[0];
+      if(pick){
+        const metric_time = !!pick.metric_time;
+        const metric_reps = pick.metric_reps !== false; // default true
+        const metric_weight = pick.metric_weight !== false; // default true
+        const ex:ExerciseWithSets = {
+          id: pick.exercise_id,
+          name: pick.name,
+          sets: metric_time ? [] : DEFAULT_SETS.map(s=>({...s})),
+          mode: metric_time ? 'time':'sets',
+          advanced:false,
+          enableReps: metric_reps,
+          enableWeight: metric_weight,
+          durationSeconds: metric_time?60:undefined,
+          timeCompleted:false,
+          metric_time, metric_reps, metric_weight, metric_distance: pick.metric_distance||false,
+        };
+        setExercises([ex]);
+        return;
+      }
+      // fallback
+      setExercises([{ id:'temp-1', name:'Push-ups', sets:DEFAULT_SETS.map(s=>({...s})), mode:'sets', advanced:false, enableReps:true, enableWeight:true, timeCompleted:false }]);
+    }
   }, [exerciseLogs,availableExercises,id,searchParams]);
 
   // Auto create session when /new
@@ -124,6 +191,7 @@ const WorkoutSession = () => {
           return {
             ...baseLog,
             duration_seconds: exercise.durationSeconds,
+            ...(exercise.metric_distance && exercise.distanceKm ? { distance_km: exercise.distanceKm } : {})
           };
         }
       } else {
@@ -150,6 +218,7 @@ const WorkoutSession = () => {
       return {
         ...baseLog,
         sets: 0,
+        ...(exercise.mode==='time' && exercise.metric_time && exercise.metric_distance && exercise.distanceKm ? { distance_km: exercise.distanceKm } : {})
       };
     }).filter(Boolean);
 
@@ -186,7 +255,17 @@ const WorkoutSession = () => {
   useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>{setDuration(d=>d+1); setHasUnsavedChanges(true);},1000); return ()=>clearInterval(int); }, [isActive]);
   const toggleSet=(eid:string,idx:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,completed:!s.completed}:s)}:ex));};
   const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));};
-  const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?((ex.mode||'sets')==='sets'?{...ex,mode:'time',durationSeconds:ex.durationSeconds||60,timeCompleted:false}:{...ex,mode:'sets',sets:ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s}))}):ex));};
+  const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
+    if(ex.id!==eid) return ex; 
+    // Only allow switching to time if the exercise supports time metric
+    if((ex.mode||'sets')==='sets'){
+      if(!ex.metric_time) return ex; // can't switch
+      return { ...ex, mode:'time', durationSeconds: ex.durationSeconds||60, timeCompleted:false };
+    } else {
+      // back to sets
+      return { ...ex, mode:'sets', sets: ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s})) };
+    }
+  }));};
   const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));};
   const toggleEnableField=(eid:string,f:'enableReps'|'enableWeight')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,[f]:!ex[f]}:ex));};
   const setTimeCompleted=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));};
@@ -268,11 +347,31 @@ const WorkoutSession = () => {
   };
 
   // Add exercise
-  const addExercise=(exercise:any)=>{ const isTime=(exercise.muscle_group||'').toLowerCase().includes('full'); const newEx:ExerciseWithSets={ id:exercise.exercise_id, name:exercise.name, sets:isTime?[]:DEFAULT_SETS.map(s=>({...s})), mode:isTime?'time':'sets', advanced:false, enableReps:true, enableWeight:true, durationSeconds:isTime?60:undefined, timeCompleted:false }; setHasUnsavedChanges(true); setExercises(p=>[...p,newEx]); setRecentExercises(prev=>{ const up=[newEx.id,...prev.filter(i=>i!==newEx.id)].slice(0,15); localStorage.setItem('recent-exercises', JSON.stringify(up)); return up; }); };
+  const addExercise=(exercise:any)=>{ 
+    // derive metrics with sensible defaults (matches inference logic)
+    const metric_time = !!exercise.metric_time;
+    const metric_reps = exercise.metric_reps !== false; // default true
+    const metric_weight = exercise.metric_weight !== false; // default true
+    const newEx:ExerciseWithSets={ 
+      id:exercise.exercise_id, 
+      name:exercise.name, 
+      sets:metric_time?[]:DEFAULT_SETS.map(s=>({...s})), 
+      mode:metric_time?'time':'sets', 
+      advanced:false, 
+      enableReps:metric_reps, 
+      enableWeight:metric_weight, 
+      durationSeconds:metric_time?60:undefined, 
+      timeCompleted:false,
+      metric_time, metric_reps, metric_weight, metric_distance: exercise.metric_distance||false,
+    }; 
+    setHasUnsavedChanges(true); 
+    setExercises(p=>[...p,newEx]); 
+    setRecentExercises(prev=>{ const up=[newEx.id,...prev.filter(i=>i!==newEx.id)].slice(0,15); localStorage.setItem('recent-exercises', JSON.stringify(up)); return up; }); 
+  };
   const toggleFavoriteExercise=(exerciseId:string)=>setFavoriteExercises(prev=>{ const up = prev.includes(exerciseId)?prev.filter(i=>i!==exerciseId):[...prev,exerciseId]; localStorage.setItem('favorite-exercises', JSON.stringify(up)); return up; });
 
   // Save workout logs
-  const saveWorkout = async ()=>{ if(!id || id==='new'){ toast.error('Please save the workout session first'); return; } try { for(const ex of exercises){ if((ex.mode||'sets')==='time'){ if(ex.timeCompleted && (ex.durationSeconds||0)>0){ await createExerciseLog.mutateAsync({ session_id:id, exercise_id:ex.id, duration_seconds:ex.durationSeconds }); } } else { const done=ex.sets.filter(s=>s.completed); if(done.length){ const payload:any={ session_id:id, exercise_id:ex.id, sets:done.length }; if(ex.enableReps!==false) payload.reps_per_set=done.map(s=>s.reps).join(','); if(ex.enableWeight!==false) payload.weight_per_set=done.map(s=>s.weight).join(','); await createExerciseLog.mutateAsync(payload); } } } toast.success('Workout saved'); navigate('/progress'); } catch { toast.error('Failed to save workout'); } };
+  const saveWorkout = async ()=>{ if(!id || id==='new'){ toast.error('Please save the workout session first'); return; } try { for(const ex of exercises){ if((ex.mode||'sets')==='time'){ if(ex.timeCompleted && (ex.durationSeconds||0)>0){ const payload:any={ session_id:id, exercise_id:ex.id, duration_seconds:ex.durationSeconds }; if(ex.metric_distance && ex.distanceKm) payload.distance_km=ex.distanceKm; await createExerciseLog.mutateAsync(payload); } } else { const done=ex.sets.filter(s=>s.completed); if(done.length){ const payload:any={ session_id:id, exercise_id:ex.id, sets:done.length }; if(ex.enableReps!==false) payload.reps_per_set=done.map(s=>s.reps).join(','); if(ex.enableWeight!==false) payload.weight_per_set=done.map(s=>s.weight).join(','); await createExerciseLog.mutateAsync(payload); } } } toast.success('Workout saved'); navigate('/progress'); } catch { toast.error('Failed to save workout'); } };
 
   // Completion counts
   const completedSets = exercises.reduce((t,ex)=>(ex.mode||'sets')==='time'?t+(ex.timeCompleted?1:0):t+ex.sets.filter(s=>s.completed).length,0);
@@ -299,7 +398,6 @@ const WorkoutSession = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2" onClick={saveWorkout}><Save className="h-4 w-4" />Save</Button>
           <div className="flex items-center gap-1 px-3 py-1.5 rounded-md border bg-background min-w-[100px]" title={
             saveState === 'saving' ? 'Auto-saving...' : 
             saveState === 'saved' ? 'All changes saved' : 
@@ -440,6 +538,14 @@ const WorkoutSession = () => {
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>updateDuration(exercise.id,(exercise.durationSeconds||0)+5)}><Plus className="h-3 w-3" /></Button>
                         </div>
                       </div>
+                      {exercise.metric_distance && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm">Distance (km):</label>
+                          <div className="flex items-center border rounded-md">
+                            <Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-24 h-8 border-0 text-center" />
+                          </div>
+                        </div>
+                      )}
                       <div className="ml-auto flex items-center gap-2">
                         {exercise.timeCompleted ? (
                           <Button variant="outline" size="sm" className="border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20" onClick={()=>setTimeCompleted(exercise.id,false)} title="Mark incomplete">Undo</Button>
@@ -492,6 +598,7 @@ const WorkoutSession = () => {
                   {(exercise.mode||'sets')==='time' ? (
                     <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
                       <div className="flex items-center gap-2"><label className="text-sm font-medium w-24">Time (sec):</label><Input type="number" value={exercise.durationSeconds||0} onChange={e=>updateDuration(exercise.id,parseInt(e.target.value)||0)} className="w-28 h-9" /></div>
+                      {exercise.metric_distance && (<div className="flex items-center gap-2"><label className="text-sm font-medium w-24">Distance (km):</label><Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-28 h-9" /></div>)}
                       <Button variant={exercise.timeCompleted?'default':'outline'} size="sm" onClick={()=>setTimeCompleted(exercise.id,!exercise.timeCompleted)} className="ml-auto" title={exercise.timeCompleted?'Click to undo':'Mark as complete'}><Check className={`h-4 w-4 mr-2 ${exercise.timeCompleted?'text-white':''}`} />{exercise.timeCompleted?'Done':'Complete'}</Button>
                     </div>
                   ) : (
