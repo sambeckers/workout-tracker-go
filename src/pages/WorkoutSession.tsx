@@ -284,16 +284,35 @@ const WorkoutSession = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={saveWorkout}><Save className="h-4 w-4" />Save</Button>
-          <div className="w-6 h-6 flex items-center justify-center" title={
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-md border bg-background min-w-[100px]" title={
             saveState === 'saving' ? 'Auto-saving...' : 
             saveState === 'saved' ? 'All changes saved' : 
             hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'
           }>
-            <Cloud className={`h-4 w-4 ${
-              saveState === 'saving' ? 'animate-pulse text-blue-500' :
-              saveState === 'saved' ? 'text-green-500' :
-              hasUnsavedChanges ? 'text-yellow-500' : 'text-muted-foreground'
-            }`} />
+            {saveState === 'saving' ? (
+              <>
+                <Cloud className="h-4 w-4 animate-pulse text-blue-500" />
+                <span className="text-sm text-blue-500">Saving...</span>
+              </>
+            ) : saveState === 'saved' ? (
+              <>
+                <div className="relative">
+                  <Cloud className="h-4 w-4 text-green-500" />
+                  <Check className="h-3 w-3 text-green-500 absolute -top-0.5 -right-0.5 animate-scale-in" />
+                </div>
+                <span className="text-sm text-green-500">Saved</span>
+              </>
+            ) : hasUnsavedChanges ? (
+              <>
+                <Cloud className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm text-yellow-500">Unsaved</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Saved</span>
+              </>
+            )}
           </div>
           {currentWorkout && (
             <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={updateSession.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
