@@ -264,9 +264,8 @@ const WorkoutSession = () => {
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={saveWorkout}><Save className="h-4 w-4" />Save</Button>
           {autoSave.isAutoSaving && (
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
+            <div className="w-6 h-6 flex items-center justify-center" title="Auto-saving...">
               <div className="animate-spin h-3 w-3 border border-gray-300 border-t-gray-600 rounded-full"></div>
-              Auto-saving...
             </div>
           )}
           {currentWorkout && (
