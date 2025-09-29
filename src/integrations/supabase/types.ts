@@ -83,6 +83,10 @@ export type Database = {
           equipment: string | null
           exercise_id: string
           media_url: string | null
+          metric_distance: boolean | null
+          metric_reps: boolean | null
+          metric_time: boolean | null
+          metric_weight: boolean | null
           muscle_group: string | null
           name: string
           updated_at: string
@@ -95,6 +99,10 @@ export type Database = {
           equipment?: string | null
           exercise_id?: string
           media_url?: string | null
+          metric_distance?: boolean | null
+          metric_reps?: boolean | null
+          metric_time?: boolean | null
+          metric_weight?: boolean | null
           muscle_group?: string | null
           name: string
           updated_at?: string
@@ -107,6 +115,10 @@ export type Database = {
           equipment?: string | null
           exercise_id?: string
           media_url?: string | null
+          metric_distance?: boolean | null
+          metric_reps?: boolean | null
+          metric_time?: boolean | null
+          metric_weight?: boolean | null
           muscle_group?: string | null
           name?: string
           updated_at?: string
