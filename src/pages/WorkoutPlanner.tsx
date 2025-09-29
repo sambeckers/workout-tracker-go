@@ -228,13 +228,16 @@ const WorkoutPlanner = () => {
             const metric_distance = exerciseData?.metric_distance || false;
 
             if(metric_time){
-              // interpret target_duration_sec according to unit
-              let seconds = ex.target_duration_sec || 0;
-              if(ex.duration_unit==='min') seconds = (ex.target_duration_sec||0) * 60;
-              else if(ex.duration_unit==='hr') seconds = (ex.target_duration_sec||0) * 3600;
-              if(seconds>0) base.duration_seconds = seconds; else base.duration_seconds = 60; // default 1 min
-              if(metric_distance && ex.target_distance_km!=null){
-                base.distance_km = ex.distance_unit==='m' ? (ex.target_distance_km/1000) : ex.target_distance_km;
+              // Store as canonical seconds in database
+              let seconds = ex.target_duration_sec || 60;
+              if(ex.duration_unit==='min') seconds = seconds * 60;
+              else if(ex.duration_unit==='hr') seconds = seconds * 3600;
+              base.duration_seconds = seconds;
+              if(metric_distance && (ex.target_distance_km!=null && ex.target_distance_km > 0)){
+                // Store as canonical km in database
+                let km = ex.target_distance_km;
+                if(ex.distance_unit==='m') km = km / 1000;
+                base.distance_km = km;
               }
               // For purely time-based, we don't set sets/reps/weight
             } else {

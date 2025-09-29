@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Plus, Play, Pause, Check, Timer, Dumbbell, Save, Minus, CheckSquare, Star, Edit, X as XIcon, GripVertical, Cloud } from 'lucide-react';
+import NumberStepper from '@/components/ui/number-stepper';
 import { UnitToggle } from '@/components/ui/unit-toggle';
 import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
@@ -334,6 +335,21 @@ const WorkoutSession = () => {
     }
   }));};
   const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));};
+  const updateDurationUnit=(eid:string,newUnit:'sec'|'min'|'hr')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
+    if(ex.id!==eid) return ex;
+    // Convert current duration to the new unit
+    const currentSeconds = ex.durationSeconds || 0;
+    let newValue = currentSeconds;
+    if(newUnit==='min') newValue = currentSeconds / 60;
+    else if(newUnit==='hr') newValue = currentSeconds / 3600;
+    // Keep seconds as-is in storage, just change display unit
+    return {...ex, duration_unit: newUnit};
+  }));};
+  const updateDistanceUnit=(eid:string,newUnit:'m'|'km')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
+    if(ex.id!==eid) return ex;
+    // Distance is already stored in km, just change display unit
+    return {...ex, distance_unit: newUnit};
+  }));};
   // Remove the toggleEnableField function as metrics are now determined by database settings
   const setTimeCompleted=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));};
   const toggleAdvanced=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?(()=>{ const adv=!ex.advanced; localStorage.setItem(`exercise-mode-${ex.id}`, adv?'advanced':'compact'); return {...ex,advanced:adv}; })():ex));};
@@ -651,43 +667,36 @@ const WorkoutSession = () => {
               {!exercise.advanced ? (
                 <div className="flex flex-wrap items-center gap-3">
                   {(exercise.mode||'sets')==='time' ? (
-                    <>
+                     <>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm">Time:</label>
-                        <div className="flex items-center border rounded-md">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>setDisplayDuration(exercise.id, Math.max(0, getDisplayDuration(exercise)- (exercise.duration_unit==='sec'?5: exercise.duration_unit==='min'?0.5:0.05)))}><Minus className="h-3 w-3" /></Button>
-                          <Input type="number" step={exercise.duration_unit==='sec'?5:exercise.duration_unit==='min'?0.5:0.05} value={getDisplayDuration(exercise)} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDuration(exercise.id,v); }} className="w-24 h-8 border-0 text-center" />
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>setDisplayDuration(exercise.id, getDisplayDuration(exercise)+ (exercise.duration_unit==='sec'?5: exercise.duration_unit==='min'?0.5:0.05))}><Plus className="h-3 w-3" /></Button>
-                        </div>
+                        <label className="text-sm">Duration:</label>
+                        <NumberStepper
+                          value={getDisplayDuration(exercise)}
+                          onChange={(v) => setDisplayDuration(exercise.id, v)}
+                          min={exercise.duration_unit==='hr' ? 0.1 : exercise.duration_unit==='min' ? 1 : 5}
+                          max={exercise.duration_unit==='hr' ? 24 : exercise.duration_unit==='min' ? 300 : 3600}
+                          step={exercise.duration_unit==='hr' ? 0.25 : exercise.duration_unit==='min' ? 1 : 15}
+                        />
                         <UnitToggle
                           units={['sec','min','hr']}
                           value={exercise.duration_unit || 'min'}
-                          onChange={(unit)=>{
-                            // convert current display value to seconds, then adjust unit
-                            setHasUnsavedChanges(true);
-                            setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; const currentDisplay = getDisplayDuration(ex); // convert to seconds first based on old unit
-                              let secs = ex.durationSeconds || 0; // already canonical
-                              return { ...ex, duration_unit: unit as any, durationSeconds: secs };
-                            }));
-                          }}
+                          onChange={(unit)=>updateDurationUnit(exercise.id, unit as any)}
                         />
                       </div>
                       {exercise.metric_distance && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Distance:</label>
-                          <div className="flex items-center border rounded-md">
-                            <Input type="number" step={exercise.distance_unit==='m'?100:0.1} value={getDisplayDistance(exercise)} placeholder={exercise.distance_unit==='m'?'0':'0.00'} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDistance(exercise.id,v); }} className="w-28 h-8 border-0 text-center" />
-                          </div>
+                          <NumberStepper
+                            value={getDisplayDistance(exercise) as number}
+                            onChange={(v) => setDisplayDistance(exercise.id, v)}
+                            min={0}
+                            max={exercise.distance_unit==='m' ? 50000 : 50}
+                            step={exercise.distance_unit==='m' ? 100 : 0.5}
+                          />
                           <UnitToggle
                             units={['m','km']}
                             value={exercise.distance_unit || 'km'}
-                            onChange={(unit)=>{
-                              setHasUnsavedChanges(true);
-                              setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; const currentDisplay = getDisplayDistance(ex); // numeric in current unit
-                                let km = ex.distanceKm || 0; // canonical
-                                return { ...ex, distance_unit: unit as any, distanceKm: km };
-                              }));
-                            }}
+                            onChange={(unit)=>updateDistanceUnit(exercise.id, unit as any)}
                           />
                         </div>
                       )}
@@ -705,22 +714,29 @@ const WorkoutSession = () => {
                       {exercise.metric_reps && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Reps:</label>
-                          <div className="flex items-center border rounded-md">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>updateAllSets(exercise.id,'reps',Math.max(0,(exercise.sets[0]?.reps||0)-1))}><Minus className="h-3 w-3" /></Button>
-                            <Input type="number" value={exercise.sets[0]?.reps||0} onChange={e=>updateAllSets(exercise.id,'reps',parseInt(e.target.value)||0)} className="w-16 h-8 border-0 text-center" />
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>updateAllSets(exercise.id,'reps',(exercise.sets[0]?.reps||0)+1)}><Plus className="h-3 w-3" /></Button>
-                          </div>
+                          <NumberStepper
+                            value={exercise.sets[0]?.reps||0}
+                            onChange={(v) => updateAllSets(exercise.id,'reps',v)}
+                            min={0}
+                            max={100}
+                            step={1}
+                          />
                         </div>
                       )}
                       {exercise.metric_weight && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Weight:</label>
-                          <div className="flex items-center border rounded-md">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>{ const currentKg=exercise.sets[0]?.weight||0; const step=useLbs?Math.round(2.5/2.20462):2.5; updateAllSets(exercise.id,'weight',Math.max(0,currentKg-step)); }}><Minus className="h-3 w-3" /></Button>
-                            <Input type="number" value={useLbs?Math.round((exercise.sets[0]?.weight||0)*2.20462):(exercise.sets[0]?.weight||0)} onChange={e=>{ const raw=parseInt(e.target.value)||0; const kg=useLbs?Math.round(raw/2.20462):raw; updateAllSets(exercise.id,'weight',kg); }} className="w-20 h-8 border-0 text-center" />
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>{ const currentKg=exercise.sets[0]?.weight||0; const step=useLbs?Math.round(2.5/2.20462):2.5; updateAllSets(exercise.id,'weight',currentKg+step); }}><Plus className="h-3 w-3" /></Button>
-                          </div>
-                          <span className="text-sm text-muted-foreground">{useLbs?'lbs':'kg'}</span>
+                          <NumberStepper
+                            value={useLbs?Math.round((exercise.sets[0]?.weight||0)*2.20462):(exercise.sets[0]?.weight||0)}
+                            onChange={(v) => {
+                              const kg=useLbs?Math.round(v/2.20462):v;
+                              updateAllSets(exercise.id,'weight',kg);
+                            }}
+                            min={0}
+                            max={useLbs?1000:500}
+                            step={useLbs?5:2.5}
+                            unit={useLbs?'lbs':'kg'}
+                          />
                         </div>
                       )}
                       <div className="ml-auto flex items-center gap-4">
@@ -742,28 +758,34 @@ const WorkoutSession = () => {
                   {(exercise.mode||'sets')==='time' ? (
                     <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
                       <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium w-16">Time:</label>
-                        <Input type="number" value={getDisplayDuration(exercise)} step={exercise.duration_unit==='sec'?5:exercise.duration_unit==='min'?0.5:0.05} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDuration(exercise.id,v); }} className="w-24 h-9" />
+                        <label className="text-sm font-medium w-20">Duration:</label>
+                        <NumberStepper
+                          value={getDisplayDuration(exercise)}
+                          onChange={(v) => setDisplayDuration(exercise.id, v)}
+                          min={exercise.duration_unit==='hr' ? 0.1 : exercise.duration_unit==='min' ? 1 : 5}
+                          max={exercise.duration_unit==='hr' ? 24 : exercise.duration_unit==='min' ? 300 : 3600}
+                          step={exercise.duration_unit==='hr' ? 0.25 : exercise.duration_unit==='min' ? 1 : 15}
+                        />
                         <UnitToggle
                           units={['sec', 'min', 'hr']}
                           value={exercise.duration_unit || 'min'}
-                          onChange={(unit) => {
-                            setHasUnsavedChanges(true);
-                            setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, duration_unit: unit as any }; }));
-                          }}
+                          onChange={(unit) => updateDurationUnit(exercise.id, unit as any)}
                         />
                       </div>
                       {exercise.metric_distance && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm font-medium w-20">Distance:</label>
-                          <Input type="number" value={getDisplayDistance(exercise)} step={exercise.distance_unit==='m'?100:0.1} placeholder={exercise.distance_unit==='m'?'0':'0.00'} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDistance(exercise.id,v); }} className="w-28 h-9" />
+                          <NumberStepper
+                            value={getDisplayDistance(exercise) as number}
+                            onChange={(v) => setDisplayDistance(exercise.id, v)}
+                            min={0}
+                            max={exercise.distance_unit==='m' ? 50000 : 50}
+                            step={exercise.distance_unit==='m' ? 100 : 0.5}
+                          />
                           <UnitToggle
                             units={['m', 'km']}
                             value={exercise.distance_unit || 'km'}
-                            onChange={(unit) => {
-                              setHasUnsavedChanges(true);
-                              setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, distance_unit: unit as any }; }));
-                            }}
+                            onChange={(unit) => updateDistanceUnit(exercise.id, unit as any)}
                           />
                         </div>
                       )}
