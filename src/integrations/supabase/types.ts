@@ -18,7 +18,9 @@ export type Database = {
         Row: {
           created_at: string
           distance_km: number | null
+          distance_unit: string | null
           duration_seconds: number | null
+          duration_unit: string | null
           exercise_id: string
           exercise_order: number | null
           log_id: string
@@ -32,7 +34,9 @@ export type Database = {
         Insert: {
           created_at?: string
           distance_km?: number | null
+          distance_unit?: string | null
           duration_seconds?: number | null
+          duration_unit?: string | null
           exercise_id: string
           exercise_order?: number | null
           log_id?: string
@@ -46,7 +50,9 @@ export type Database = {
         Update: {
           created_at?: string
           distance_km?: number | null
+          distance_unit?: string | null
           duration_seconds?: number | null
+          duration_unit?: string | null
           exercise_id?: string
           exercise_order?: number | null
           log_id?: string

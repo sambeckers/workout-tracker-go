@@ -52,6 +52,8 @@ export const useAutoSave = (options: AutoSaveOptions = {}) => {
       weight_per_set?: string;
       duration_seconds?: number;
       distance_km?: number;
+      duration_unit?: string;
+      distance_unit?: string;
       exercise_order?: number;
       notes?: string;
     }>) => {

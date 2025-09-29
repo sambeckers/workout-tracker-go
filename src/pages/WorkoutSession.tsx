@@ -128,9 +128,11 @@ const WorkoutSession = () => {
         } else if (log.duration_seconds) {
           // Time-based planned/logged exercise
           acc[eid].durationSeconds = log.duration_seconds; // store raw seconds; UI will interpret based on unit toggles later
+          acc[eid].duration_unit = ((log as any).duration_unit as 'sec'|'min'|'hr') || 'min';
         }
         if ((log as any).distance_km) {
           acc[eid].distanceKm = (log as any).distance_km;
+          acc[eid].distance_unit = ((log as any).distance_unit as 'm'|'km') || 'km';
         }
         return acc; 
       }, {} as Record<string,ExerciseWithSets>); 
@@ -242,10 +244,12 @@ const WorkoutSession = () => {
           const logData: any = {
             ...baseLog,
             duration_seconds: exercise.durationSeconds || 0,
+            duration_unit: exercise.duration_unit || 'min',
           };
           
           if (exercise.metric_distance && exercise.distanceKm) {
             logData.distance_km = exercise.distanceKm;
+            logData.distance_unit = exercise.distance_unit || 'km';
           }
           
           return logData;
