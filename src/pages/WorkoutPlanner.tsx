@@ -12,6 +12,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save, Search, Star, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import NumberStepper from '@/components/ui/number-stepper';
+import { UnitToggle } from '@/components/ui/unit-toggle';
 import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseLogs, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
 import { toast } from 'sonner';
 import { format } from '@/lib/date-utils';
@@ -26,6 +27,8 @@ interface SelectedExercise {
   target_weight?: number; // stored in kg
   target_duration_sec?: number; // optional per set duration
   target_distance_km?: number; // for distance-based exercises
+  duration_unit?: 'sec' | 'min' | 'hr';
+  distance_unit?: 'm' | 'km';
 }
 
 const WorkoutPlanner = () => {
@@ -100,7 +103,9 @@ const WorkoutPlanner = () => {
       target_reps: '10',
       notes: '',
       target_weight: 20,
-      target_duration_sec: 0
+      target_duration_sec: 0,
+      duration_unit: 'min' as const,
+      distance_unit: 'km' as const
     }));
     const combined = [...selectedExercises, ...newlyAdded.filter(ne => !selectedExercises.some(se => se.exercise_id === ne.exercise_id))];
     setSelectedExercises(combined);
@@ -545,32 +550,46 @@ const WorkoutPlanner = () => {
                                  />
                                </div>
                              )}
-                             {showTime && (
-                               <div className="space-y-2">
-                                 <Label className="text-sm">Duration (seconds)</Label>
-                                 <NumberStepper
-                                   value={exercise.target_duration_sec || 60}
-                                   onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
-                                   min={1}
-                                   max={3600}
-                                   step={5}
-                                   unit="sec"
-                                 />
-                               </div>
-                             )}
-                             {showDistance && (
-                               <div className="space-y-2">
-                                 <Label className="text-sm">Distance (km)</Label>
-                                 <NumberStepper
-                                   value={exercise.target_distance_km || 0}
-                                   onChange={(v) => updateExercise(index, 'target_distance_km', v)}
-                                   min={0}
-                                   max={50}
-                                   step={0.1}
-                                   unit="km"
-                                 />
-                               </div>
-                             )}
+                              {showTime && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Duration</Label>
+                                  <div className="flex items-center gap-2">
+                                    <NumberStepper
+                                      value={exercise.target_duration_sec || 60}
+                                      onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
+                                      min={1}
+                                      max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
+                                      step={exercise.duration_unit === 'hr' ? 0.5 : exercise.duration_unit === 'min' ? 1 : 5}
+                                      unit=""
+                                    />
+                                    <UnitToggle
+                                      units={['sec', 'min', 'hr']}
+                                      value={exercise.duration_unit || 'min'}
+                                      onChange={(unit) => updateExercise(index, 'duration_unit', unit)}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              {showDistance && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Distance</Label>
+                                  <div className="flex items-center gap-2">
+                                    <NumberStepper
+                                      value={exercise.target_distance_km || 0}
+                                      onChange={(v) => updateExercise(index, 'target_distance_km', v)}
+                                      min={0}
+                                      max={exercise.distance_unit === 'm' ? 50000 : 50}
+                                      step={exercise.distance_unit === 'm' ? 100 : 0.1}
+                                      unit=""
+                                    />
+                                    <UnitToggle
+                                      units={['m', 'km']}
+                                      value={exercise.distance_unit || 'km'}
+                                      onChange={(unit) => updateExercise(index, 'distance_unit', unit)}
+                                    />
+                                  </div>
+                                </div>
+                              )}
                            </div>
                          );
                        })()}

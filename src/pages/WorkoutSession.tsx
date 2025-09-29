@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Plus, Play, Pause, Check, Timer, Dumbbell, Save, Minus, CheckSquare, Star, Edit, X as XIcon, GripVertical, Cloud } from 'lucide-react';
+import { UnitToggle } from '@/components/ui/unit-toggle';
 import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
 import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession } from '@/hooks/useWorkoutData';
@@ -34,6 +35,8 @@ interface ExerciseWithSets {
   metric_reps?: boolean; 
   metric_distance?: boolean; 
   distanceKm?: number; // captured when distance metric active
+  duration_unit?: 'sec' | 'min' | 'hr';
+  distance_unit?: 'm' | 'km';
 }
 
 const DEFAULT_SETS: Set[] = [
@@ -597,8 +600,32 @@ const WorkoutSession = () => {
                 <div className="space-y-3">
                   {(exercise.mode||'sets')==='time' ? (
                     <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2"><label className="text-sm font-medium w-24">Time (sec):</label><Input type="number" value={exercise.durationSeconds||0} onChange={e=>updateDuration(exercise.id,parseInt(e.target.value)||0)} className="w-28 h-9" /></div>
-                      {exercise.metric_distance && (<div className="flex items-center gap-2"><label className="text-sm font-medium w-24">Distance (km):</label><Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-28 h-9" /></div>)}
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium w-16">Time:</label>
+                        <Input type="number" value={exercise.durationSeconds||0} onChange={e=>updateDuration(exercise.id,parseInt(e.target.value)||0)} className="w-20 h-9" />
+                        <UnitToggle
+                          units={['sec', 'min', 'hr']}
+                          value={exercise.duration_unit || 'min'}
+                          onChange={(unit) => {
+                            setHasUnsavedChanges(true);
+                            setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,duration_unit:unit as any}:ex));
+                          }}
+                        />
+                      </div>
+                      {exercise.metric_distance && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium w-20">Distance:</label>
+                          <Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-20 h-9" />
+                          <UnitToggle
+                            units={['m', 'km']}
+                            value={exercise.distance_unit || 'km'}
+                            onChange={(unit) => {
+                              setHasUnsavedChanges(true);
+                              setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distance_unit:unit as any}:ex));
+                            }}
+                          />
+                        </div>
+                      )}
                       <Button variant={exercise.timeCompleted?'default':'outline'} size="sm" onClick={()=>setTimeCompleted(exercise.id,!exercise.timeCompleted)} className="ml-auto" title={exercise.timeCompleted?'Click to undo':'Mark as complete'}><Check className={`h-4 w-4 mr-2 ${exercise.timeCompleted?'text-white':''}`} />{exercise.timeCompleted?'Done':'Complete'}</Button>
                     </div>
                   ) : (
