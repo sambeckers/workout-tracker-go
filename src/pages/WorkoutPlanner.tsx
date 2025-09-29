@@ -215,17 +215,38 @@ const WorkoutPlanner = () => {
               return new Array(ex.target_sets).fill(10).join(',');
             })() : new Array(ex.target_sets).fill(parseInt(ex.target_reps) || 10).join(',');
             const weights = new Array(ex.target_sets).fill(ex.target_weight || 0).join(',');
-            return {
+            const base: any = {
               session_id: result.session_id,
               exercise_id: ex.exercise_id,
-              sets: ex.target_sets,
-              reps_per_set: repsExpanded,
-              weight_per_set: weights,
-              duration_seconds: ex.target_duration_sec ? ex.target_duration_sec * ex.target_sets : undefined,
               notes: ex.notes || ''
             };
+            // Determine if exercise is time-based (no reps/weight metrics) by checking underlying exercise data
+            const exerciseData = exercises.find(e => e.exercise_id === ex.exercise_id) as any;
+            const metric_time = exerciseData?.metric_time || false;
+            const metric_reps = exerciseData?.metric_reps !== false; // default true
+            const metric_weight = exerciseData?.metric_weight !== false; // default true
+            const metric_distance = exerciseData?.metric_distance || false;
+
+            if(metric_time){
+              // interpret target_duration_sec according to unit
+              let seconds = ex.target_duration_sec || 0;
+              if(ex.duration_unit==='min') seconds = (ex.target_duration_sec||0) * 60;
+              else if(ex.duration_unit==='hr') seconds = (ex.target_duration_sec||0) * 3600;
+              if(seconds>0) base.duration_seconds = seconds; else base.duration_seconds = 60; // default 1 min
+              if(metric_distance && ex.target_distance_km!=null){
+                base.distance_km = ex.distance_unit==='m' ? (ex.target_distance_km/1000) : ex.target_distance_km;
+              }
+              // For purely time-based, we don't set sets/reps/weight
+            } else {
+              base.sets = ex.target_sets;
+              if(metric_reps) base.reps_per_set = repsExpanded;
+              if(metric_weight) base.weight_per_set = weights;
+              // If distance metric present alongside sets (rare hybrid), we don't log distance until performed
+            }
+            return base;
           });
           await bulkLogsMutation.mutateAsync(logsPayload as any);
+          try { localStorage.setItem(`planned-exercises-${result.session_id}`, JSON.stringify(selectedExercises)); } catch {}
         }
         toast.success('Workout planned successfully!');
         navigate(`/dashboard/workout/${result.session_id}`);
@@ -254,7 +275,7 @@ const WorkoutPlanner = () => {
         </div>
         <Button onClick={handleSave} disabled={createWorkoutMutation.isPending}>
           <Save className="h-4 w-4 mr-2" />
-          {editingSessionId ? 'Save Changes' : 'Save & Start'}
+          {editingSessionId ? 'Save Changes' : 'Save'}
         </Button>
       </div>
 

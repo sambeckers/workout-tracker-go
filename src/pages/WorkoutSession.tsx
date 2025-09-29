@@ -115,6 +115,8 @@ const WorkoutSession = () => {
             enableWeight: metric_weight, 
             timeCompleted:false,
             metric_time, metric_reps, metric_weight, metric_distance: base?.metric_distance||false,
+            durationSeconds: undefined,
+            distanceKm: undefined,
         } as ExerciseWithSets; 
         if(log.sets){ 
           const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; 
@@ -122,13 +124,57 @@ const WorkoutSession = () => {
           for(let i=0;i<log.sets;i++){ 
             acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed:false }); 
           } 
+        } else if (log.duration_seconds) {
+          // Time-based planned/logged exercise
+          acc[eid].durationSeconds = log.duration_seconds; // store raw seconds; UI will interpret based on unit toggles later
+        }
+        if ((log as any).distance_km) {
+          acc[eid].distanceKm = (log as any).distance_km;
         }
         return acc; 
       }, {} as Record<string,ExerciseWithSets>); 
       setExercises(Object.values(groups)); 
       return; 
     }
-    if(id && id!=='new' && id!=='quick'){ const key=`planned-exercises-${id}`; const raw=localStorage.getItem(key); if(raw){ try { const parsed=JSON.parse(raw); setExercises(parsed.map((ex:any)=>({ id: ex.exercise_id, name: ex.name, sets: Array.from({length: ex.target_sets}, (_,i)=>({ setNumber:i+1, reps: parseInt(ex.target_reps||'10')||10, weight: parseInt(ex.target_weight||'0')||0, completed:false })), advanced: localStorage.getItem(`exercise-mode-${ex.exercise_id}`)==='advanced', mode:'sets', enableReps:true, enableWeight:true, timeCompleted:false }))); localStorage.removeItem(key); } catch(e){ console.error('Failed to parse planned exercises', e); } } return; }
+    if(id && id!=='new' && id!=='quick'){ const key=`planned-exercises-${id}`; const raw=localStorage.getItem(key); if(raw){ try { const parsed=JSON.parse(raw); setExercises(parsed.map((ex:any)=>{ 
+          const base = availableExercises.find(b=>b.exercise_id===ex.exercise_id) as any;
+          const metric_time = base?.metric_time || false;
+          const metric_reps = base?.metric_reps !== false; // default true
+          const metric_weight = base?.metric_weight !== false; // default true
+          const metric_distance = base?.metric_distance || false;
+          // Determine mode and initial duration/distance
+          let durationSeconds: number | undefined = undefined;
+          if(metric_time){
+            // Preserve original entered value – store canonical seconds but keep unit info so UI can reconstruct
+            const rawDur = ex.target_duration_sec || 0;
+            if(rawDur>0){
+              if(ex.duration_unit==='hr') durationSeconds = rawDur * 3600; 
+              else if(ex.duration_unit==='min') durationSeconds = rawDur * 60; 
+              else durationSeconds = rawDur; 
+            } else {
+              durationSeconds = 60; // default
+            }
+          }
+          let distanceKm: number | undefined = undefined;
+            if(metric_distance && ex.target_distance_km!=null){
+              distanceKm = ex.distance_unit==='m' ? (ex.target_distance_km/1000) : ex.target_distance_km; 
+            }
+          return ({ 
+            id: ex.exercise_id, 
+            name: ex.name, 
+            sets: metric_time ? [] : Array.from({length: ex.target_sets||3}, (_,i)=>({ setNumber:i+1, reps: parseInt(ex.target_reps||'10')||10, weight: parseInt(ex.target_weight||'0')||0, completed:false })), 
+            advanced: localStorage.getItem(`exercise-mode-${ex.exercise_id}`)==='advanced', 
+            mode: metric_time ? 'time':'sets', 
+            enableReps: metric_reps, 
+            enableWeight: metric_weight, 
+            timeCompleted:false, 
+            metric_time, metric_reps, metric_weight, metric_distance,
+            durationSeconds,
+            distanceKm,
+            duration_unit: ex.duration_unit || 'min',
+            distance_unit: ex.distance_unit || 'km'
+          }); 
+        })); localStorage.removeItem(key); } catch(e){ console.error('Failed to parse planned exercises', e); } } return; }
     if(id==='new'){ 
       const exerciseId=searchParams.get('exerciseId'); 
       const pick = exerciseId? availableExercises.find(e=>e.exercise_id===exerciseId) : availableExercises[0];
@@ -407,12 +453,48 @@ const WorkoutSession = () => {
   const uniqueMuscleGroups = Array.from(new Set(availableExercises.flatMap(ex=>(ex.muscle_group||'').split(',').map(g=>g.trim()).filter(Boolean)))).sort();
   const workoutTitle = currentWorkout?.title || (id==='new'?'New Workout':'Workout Session');
 
+  // Helper: derive display values for time/distance based on selected unit while keeping canonical storage (seconds / km)
+  const getDisplayDuration = (ex: ExerciseWithSets) => {
+    const secs = ex.durationSeconds || 0;
+    switch(ex.duration_unit){
+      case 'hr': return +(secs / 3600).toFixed(2);
+      case 'min': return +(secs / 60).toFixed(2);
+      default: return secs; // sec
+    }
+  };
+  const setDisplayDuration = (exerciseId: string, value: number) => {
+    setHasUnsavedChanges(true);
+    setExercises(prev => prev.map(ex => {
+      if(ex.id!==exerciseId) return ex;
+      const unit = ex.duration_unit;
+      let secs = Math.max(0, value);
+      if(unit==='min') secs = value * 60;
+      else if(unit==='hr') secs = value * 3600;
+      return { ...ex, durationSeconds: Math.round(secs) };
+    }));
+  };
+  const getDisplayDistance = (ex: ExerciseWithSets) => {
+    if(!ex.metric_distance) return '';
+    const km = ex.distanceKm || 0;
+    return ex.distance_unit === 'm' ? Math.round(km * 1000) : +km.toFixed(2);
+  };
+  const setDisplayDistance = (exerciseId: string, value: number) => {
+    setHasUnsavedChanges(true);
+    setExercises(prev => prev.map(ex => {
+      if(ex.id!==exerciseId) return ex;
+      if(!ex.metric_distance) return ex;
+      let km = value;
+      if(ex.distance_unit==='m') km = value / 1000;
+      return { ...ex, distanceKm: km };
+    }));
+  };
+
   return (
     <div className="app-container p-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={()=>navigate(-1)}><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={()=>navigate('/dashboard/schedule')}><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <h1 className="text-3xl font-bold">{workoutTitle}</h1>
             <p className="text-muted-foreground">Track your workout progress</p>
@@ -534,20 +616,19 @@ const WorkoutSession = () => {
                               {(exercise.mode||'sets')==='time' ? (
                                 <>
                                   <Badge variant="outline">
-                                    Time: {(() => {
-                                      let seconds = exercise.durationSeconds || 0;
-                                      if (exercise.duration_unit === 'min') seconds *= 60;
-                                      else if (exercise.duration_unit === 'hr') seconds *= 3600;
-                                      return seconds;
-                                    })()}s {exercise.timeCompleted?'✓':''}
+                                    {(() => {
+                                      const val = getDisplayDuration(exercise);
+                                      const unit = exercise.duration_unit || 'sec';
+                                      return `Time: ${val}${unit}`;
+                                    })()} {exercise.timeCompleted?'✓':''}
                                   </Badge>
-                                  {exercise.metric_distance && exercise.distanceKm && (
+                                  {exercise.metric_distance && exercise.distanceKm!=null && (
                                     <Badge variant="outline">
-                                      Distance: {(() => {
-                                        let km = exercise.distanceKm;
-                                        if (exercise.distance_unit === 'm') km /= 1000;
-                                        return km;
-                                      })()}km
+                                      {(() => {
+                                        const unit = exercise.distance_unit || 'km';
+                                        const val = getDisplayDistance(exercise);
+                                        return `Distance: ${val}${unit}`;
+                                      })()}
                                     </Badge>
                                   )}
                                 </>
@@ -572,19 +653,42 @@ const WorkoutSession = () => {
                   {(exercise.mode||'sets')==='time' ? (
                     <>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm">Time (sec):</label>
+                        <label className="text-sm">Time:</label>
                         <div className="flex items-center border rounded-md">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>updateDuration(exercise.id,(exercise.durationSeconds||0)-5)}><Minus className="h-3 w-3" /></Button>
-                          <Input type="number" value={exercise.durationSeconds||0} onChange={e=>updateDuration(exercise.id,parseInt(e.target.value)||0)} className="w-20 h-8 border-0 text-center" />
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>updateDuration(exercise.id,(exercise.durationSeconds||0)+5)}><Plus className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>setDisplayDuration(exercise.id, Math.max(0, getDisplayDuration(exercise)- (exercise.duration_unit==='sec'?5: exercise.duration_unit==='min'?0.5:0.05)))}><Minus className="h-3 w-3" /></Button>
+                          <Input type="number" step={exercise.duration_unit==='sec'?5:exercise.duration_unit==='min'?0.5:0.05} value={getDisplayDuration(exercise)} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDuration(exercise.id,v); }} className="w-24 h-8 border-0 text-center" />
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={()=>setDisplayDuration(exercise.id, getDisplayDuration(exercise)+ (exercise.duration_unit==='sec'?5: exercise.duration_unit==='min'?0.5:0.05))}><Plus className="h-3 w-3" /></Button>
                         </div>
+                        <UnitToggle
+                          units={['sec','min','hr']}
+                          value={exercise.duration_unit || 'min'}
+                          onChange={(unit)=>{
+                            // convert current display value to seconds, then adjust unit
+                            setHasUnsavedChanges(true);
+                            setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; const currentDisplay = getDisplayDuration(ex); // convert to seconds first based on old unit
+                              let secs = ex.durationSeconds || 0; // already canonical
+                              return { ...ex, duration_unit: unit as any, durationSeconds: secs };
+                            }));
+                          }}
+                        />
                       </div>
                       {exercise.metric_distance && (
                         <div className="flex items-center gap-2">
-                          <label className="text-sm">Distance (km):</label>
+                          <label className="text-sm">Distance:</label>
                           <div className="flex items-center border rounded-md">
-                            <Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-24 h-8 border-0 text-center" />
+                            <Input type="number" step={exercise.distance_unit==='m'?100:0.1} value={getDisplayDistance(exercise)} placeholder={exercise.distance_unit==='m'?'0':'0.00'} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDistance(exercise.id,v); }} className="w-28 h-8 border-0 text-center" />
                           </div>
+                          <UnitToggle
+                            units={['m','km']}
+                            value={exercise.distance_unit || 'km'}
+                            onChange={(unit)=>{
+                              setHasUnsavedChanges(true);
+                              setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; const currentDisplay = getDisplayDistance(ex); // numeric in current unit
+                                let km = ex.distanceKm || 0; // canonical
+                                return { ...ex, distance_unit: unit as any, distanceKm: km };
+                              }));
+                            }}
+                          />
                         </div>
                       )}
                       <div className="ml-auto flex items-center gap-2">
@@ -639,26 +743,26 @@ const WorkoutSession = () => {
                     <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
                       <div className="flex items-center gap-2">
                         <label className="text-sm font-medium w-16">Time:</label>
-                        <Input type="number" value={exercise.durationSeconds||0} onChange={e=>updateDuration(exercise.id,parseInt(e.target.value)||0)} className="w-20 h-9" />
+                        <Input type="number" value={getDisplayDuration(exercise)} step={exercise.duration_unit==='sec'?5:exercise.duration_unit==='min'?0.5:0.05} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDuration(exercise.id,v); }} className="w-24 h-9" />
                         <UnitToggle
                           units={['sec', 'min', 'hr']}
                           value={exercise.duration_unit || 'min'}
                           onChange={(unit) => {
                             setHasUnsavedChanges(true);
-                            setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,duration_unit:unit as any}:ex));
+                            setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, duration_unit: unit as any }; }));
                           }}
                         />
                       </div>
                       {exercise.metric_distance && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm font-medium w-20">Distance:</label>
-                          <Input type="number" value={exercise.distanceKm ?? ''} placeholder="0.00" onChange={e=>{ const v=parseFloat(e.target.value); setHasUnsavedChanges(true); setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distanceKm:isNaN(v)?undefined:v}:ex)); }} className="w-20 h-9" />
+                          <Input type="number" value={getDisplayDistance(exercise)} step={exercise.distance_unit==='m'?100:0.1} placeholder={exercise.distance_unit==='m'?'0':'0.00'} onChange={e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)) setDisplayDistance(exercise.id,v); }} className="w-28 h-9" />
                           <UnitToggle
                             units={['m', 'km']}
                             value={exercise.distance_unit || 'km'}
                             onChange={(unit) => {
                               setHasUnsavedChanges(true);
-                              setExercises(p=>p.map(ex=>ex.id===exercise.id?{...ex,distance_unit:unit as any}:ex));
+                              setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, distance_unit: unit as any }; }));
                             }}
                           />
                         </div>
