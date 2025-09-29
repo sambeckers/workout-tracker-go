@@ -238,26 +238,15 @@ const WorkoutSession = () => {
 
       if (exercise.mode === 'time') {
         if (exercise.timeCompleted && exercise.durationSeconds) {
-          // Convert duration to seconds based on unit
-          let durationInSeconds = exercise.durationSeconds;
-          if (exercise.duration_unit === 'min') {
-            durationInSeconds = exercise.durationSeconds * 60;
-          } else if (exercise.duration_unit === 'hr') {
-            durationInSeconds = exercise.durationSeconds * 3600;
-          }
-          
+          // durationSeconds is already in canonical seconds, no conversion needed
           const logData: any = {
             ...baseLog,
-            duration_seconds: durationInSeconds,
+            duration_seconds: exercise.durationSeconds,
           };
           
-          // Convert distance to km based on unit
+          // distanceKm is already in canonical km, no conversion needed
           if (exercise.metric_distance && exercise.distanceKm) {
-            let distanceInKm = exercise.distanceKm;
-            if (exercise.distance_unit === 'm') {
-              distanceInKm = exercise.distanceKm / 1000;
-            }
-            logData.distance_km = distanceInKm;
+            logData.distance_km = exercise.distanceKm;
           }
           
           return logData;
@@ -334,15 +323,17 @@ const WorkoutSession = () => {
       return { ...ex, mode:'sets', sets: ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s})) };
     }
   }));};
-  const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));};
+  const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
+    if(ex.id!==eid) return ex;
+    // durationSeconds always stores canonical seconds, so convert display value to seconds
+    let seconds = Math.max(0, val);
+    if(ex.duration_unit==='min') seconds = val * 60;
+    else if(ex.duration_unit==='hr') seconds = val * 3600;
+    return {...ex, durationSeconds: seconds};
+  }));};
   const updateDurationUnit=(eid:string,newUnit:'sec'|'min'|'hr')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
     if(ex.id!==eid) return ex;
-    // Convert current duration to the new unit
-    const currentSeconds = ex.durationSeconds || 0;
-    let newValue = currentSeconds;
-    if(newUnit==='min') newValue = currentSeconds / 60;
-    else if(newUnit==='hr') newValue = currentSeconds / 3600;
-    // Keep seconds as-is in storage, just change display unit
+    // durationSeconds stays as canonical seconds, just change display unit
     return {...ex, duration_unit: newUnit};
   }));};
   const updateDistanceUnit=(eid:string,newUnit:'m'|'km')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
