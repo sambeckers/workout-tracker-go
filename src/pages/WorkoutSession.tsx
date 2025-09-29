@@ -531,7 +531,27 @@ const WorkoutSession = () => {
                               <span>{exercise.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              {(exercise.mode||'sets')==='time' ? <Badge variant="outline">Time: {exercise.durationSeconds||0}s {exercise.timeCompleted?'✓':''}</Badge> : <Badge variant="outline">{exercise.sets.filter(s=>s.completed).length}/{exercise.sets.length} sets</Badge>}
+                              {(exercise.mode||'sets')==='time' ? (
+                                <>
+                                  <Badge variant="outline">
+                                    Time: {(() => {
+                                      let seconds = exercise.durationSeconds || 0;
+                                      if (exercise.duration_unit === 'min') seconds *= 60;
+                                      else if (exercise.duration_unit === 'hr') seconds *= 3600;
+                                      return seconds;
+                                    })()}s {exercise.timeCompleted?'✓':''}
+                                  </Badge>
+                                  {exercise.metric_distance && exercise.distanceKm && (
+                                    <Badge variant="outline">
+                                      Distance: {(() => {
+                                        let km = exercise.distanceKm;
+                                        if (exercise.distance_unit === 'm') km /= 1000;
+                                        return km;
+                                      })()}km
+                                    </Badge>
+                                  )}
+                                </>
+                              ) : <Badge variant="outline">{exercise.sets.filter(s=>s.completed).length}/{exercise.sets.length} sets</Badge>}
                               <Button variant="ghost" size="sm" onClick={()=>toggleAdvanced(exercise.id)}>{exercise.advanced?'Compact':'Advanced'}</Button>
                               <Button variant="ghost" size="sm" onClick={()=>toggleMode(exercise.id)}>{(exercise.mode||'sets')==='time'?'Use Sets':'Use Time'}</Button>
                               <Button 
