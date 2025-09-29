@@ -25,6 +25,7 @@ interface SelectedExercise {
   notes?: string;
   target_weight?: number; // stored in kg
   target_duration_sec?: number; // optional per set duration
+  target_distance_km?: number; // for distance-based exercises
 }
 
 const WorkoutPlanner = () => {
@@ -498,66 +499,81 @@ const WorkoutPlanner = () => {
                         </Button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <Label className="text-sm">Sets</Label>
-                          <NumberStepper
-                            value={exercise.target_sets}
-                            onChange={(v) => updateExercise(index, 'target_sets', v)}
-                            min={1}
-                            max={10}
-                            step={1}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-sm">Weight</Label>
-                          <NumberStepper
-                            value={useLbs ? Math.round((exercise.target_weight||0)*2.20462) : (exercise.target_weight||0)}
-                            onChange={(v) => updateExercise(index, 'target_weight', useLbs ? Math.round(v/2.20462) : v)}
-                            min={0}
-                            max={useLbs ? 400 : 180}
-                            step={useLbs ? 5 : 2}
-                            unit={useLbs ? 'lbs' : 'kg'}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-sm flex items-center gap-2">Time/Set
-                            <Switch
-                              checked={(exercise.target_duration_sec || 0) > 0}
-                              onCheckedChange={(checked) => updateExercise(index, 'target_duration_sec', checked ? (exercise.target_duration_sec || 30) : 0)}
-                            />
-                          </Label>
-                          <NumberStepper
-                            value={exercise.target_duration_sec || 0}
-                            onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
-                            min={0}
-                            max={300}
-                            step={5}
-                            unit="sec"
-                            disabled={(exercise.target_duration_sec || 0) === 0}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid gap-2 mt-4">
-                        <Label className="text-sm">Reps per set</Label>
-                        <NumberStepper
-                          value={parseInt(exercise.target_reps || '0') || 10}
-                          onChange={(v) => updateExercise(index, 'target_reps', String(Math.max(0, v || 0)))}
-                          min={0}
-                          max={100}
-                          step={1}
-                        />
-                      </div>
-                      
-                      <div className="grid gap-2 mt-4">
-                        <Label className="text-sm">Exercise Notes</Label>
-                        <Input
-                          value={exercise.notes || ''}
-                          onChange={(e) => updateExercise(index, 'notes', e.target.value)}
-                          placeholder="Form cues, weight progression..."
-                        />
-                      </div>
-                    </Card>
+                      {(() => {
+                        // Find the exercise data to get metric settings
+                        const exerciseData = exercises.find(ex => ex.exercise_id === exercise.exercise_id);
+                        const showReps = exerciseData?.metric_reps !== false; // default true
+                        const showWeight = exerciseData?.metric_weight !== false; // default true  
+                        const showTime = exerciseData?.metric_time === true;
+                        const showDistance = exerciseData?.metric_distance === true;
+                        
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {/* Always show sets for weight/rep exercises */}
+                            {(showReps || showWeight) && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">Sets</Label>
+                                <NumberStepper
+                                  value={exercise.target_sets}
+                                  onChange={(v) => updateExercise(index, 'target_sets', v)}
+                                  min={1}
+                                  max={10}
+                                  step={1}
+                                />
+                              </div>
+                            )}
+                            {showWeight && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">Weight</Label>
+                                <NumberStepper
+                                  value={useLbs ? Math.round((exercise.target_weight||0)*2.20462) : (exercise.target_weight||0)}
+                                  onChange={(v) => updateExercise(index, 'target_weight', useLbs ? Math.round(v/2.20462) : v)}
+                                  min={0}
+                                  max={useLbs ? 400 : 180}
+                                  step={useLbs ? 5 : 2}
+                                  unit={useLbs ? 'lbs' : 'kg'}
+                                />
+                              </div>
+                            )}
+                            {showTime && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">Duration (seconds)</Label>
+                                <NumberStepper
+                                  value={exercise.target_duration_sec || 60}
+                                  onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
+                                  min={1}
+                                  max={3600}
+                                  step={5}
+                                  unit="sec"
+                                />
+                              </div>
+                            )}
+                            {showDistance && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">Distance (km)</Label>
+                                <NumberStepper
+                                  value={exercise.target_distance_km || 0}
+                                  onChange={(v) => updateExercise(index, 'target_distance_km', v)}
+                                  min={0}
+                                  max={50}
+                                  step={0.1}
+                                  unit="km"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                       })()}
+                       
+                       <div className="grid gap-2 mt-4">
+                         <Label className="text-sm">Exercise Notes</Label>
+                         <Input
+                           value={exercise.notes || ''}
+                           onChange={(e) => updateExercise(index, 'notes', e.target.value)}
+                           placeholder="Form cues, weight progression..."
+                         />
+                       </div>
+                     </Card>
                   ))
                 )}
               </div>

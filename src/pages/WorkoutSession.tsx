@@ -202,11 +202,11 @@ const WorkoutSession = () => {
             sets: completedSets.length,
           };
           
-          if (exercise.enableReps !== false) {
+          if (exercise.metric_reps) {
             logData.reps_per_set = completedSets.map(s => s.reps).join(',');
           }
           
-          if (exercise.enableWeight !== false) {
+          if (exercise.metric_weight) {
             logData.weight_per_set = completedSets.map(s => s.weight).join(',');
           }
           
@@ -257,17 +257,18 @@ const WorkoutSession = () => {
   const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));};
   const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
     if(ex.id!==eid) return ex; 
-    // Only allow switching to time if the exercise supports time metric
+    // Only allow switching modes if the exercise supports both
     if((ex.mode||'sets')==='sets'){
-      if(!ex.metric_time) return ex; // can't switch
+      if(!ex.metric_time) return ex; // can't switch to time
       return { ...ex, mode:'time', durationSeconds: ex.durationSeconds||60, timeCompleted:false };
     } else {
-      // back to sets
+      // back to sets - only if exercise supports reps or weight
+      if(!ex.metric_reps && !ex.metric_weight) return ex; // can't switch to sets
       return { ...ex, mode:'sets', sets: ex.sets.length?ex.sets:DEFAULT_SETS.map(s=>({...s})) };
     }
   }));};
   const updateDuration=(eid:string,val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,durationSeconds:Math.max(0,val)}:ex));};
-  const toggleEnableField=(eid:string,f:'enableReps'|'enableWeight')=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,[f]:!ex[f]}:ex));};
+  // Remove the toggleEnableField function as metrics are now determined by database settings
   const setTimeCompleted=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));};
   const toggleAdvanced=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?(()=>{ const adv=!ex.advanced; localStorage.setItem(`exercise-mode-${ex.id}`, adv?'advanced':'compact'); return {...ex,advanced:adv}; })():ex));};
   const updateAllSets=(eid:string,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,[field]:val}))}:ex));};
@@ -557,7 +558,7 @@ const WorkoutSession = () => {
                   ) : (
                     <>
                       <div className="text-sm text-muted-foreground">{exercise.sets.length} sets ×</div>
-                      {exercise.enableReps!==false && (
+                      {exercise.metric_reps && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Reps:</label>
                           <div className="flex items-center border rounded-md">
@@ -567,7 +568,7 @@ const WorkoutSession = () => {
                           </div>
                         </div>
                       )}
-                      {exercise.enableWeight!==false && (
+                      {exercise.metric_weight && (
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Weight:</label>
                           <div className="flex items-center border rounded-md">
@@ -579,8 +580,7 @@ const WorkoutSession = () => {
                         </div>
                       )}
                       <div className="ml-auto flex items-center gap-4">
-                        <div className="flex items-center gap-3"><span className="text-sm text-muted-foreground">Reps</span><Switch checked={exercise.enableReps!==false} onCheckedChange={()=>toggleEnableField(exercise.id,'enableReps')} /></div>
-                        <div className="flex items-center gap-3"><span className="text-sm text-muted-foreground">Weight</span><Switch checked={exercise.enableWeight!==false} onCheckedChange={()=>toggleEnableField(exercise.id,'enableWeight')} /></div>
+                        {/* Metric toggles removed - now determined by exercise database settings */}
                         {exercise.sets.every(s=>s.completed) ? (
                           <Button variant="outline" size="sm" className="border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20" onClick={()=>setAllSetsCompletion(exercise.id,false)} title="Mark all incomplete">Undo All</Button>
                         ) : (
