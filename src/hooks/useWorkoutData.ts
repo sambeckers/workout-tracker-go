@@ -14,6 +14,7 @@ export interface WorkoutSession {
   duration_minutes?: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface Exercise {
@@ -86,7 +87,30 @@ export const useWorkoutSessions = () => {
         .from('workout_sessions')
         .select('*')
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .order('date', { ascending: false });
+      
+      if (error) throw error;
+      return data as WorkoutSession[];
+    },
+    enabled: !!user?.id,
+  });
+};
+
+export const useDeletedWorkoutSessions = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['deleted-workout-sessions', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase
+        .from('workout_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
       
       if (error) throw error;
       return data as WorkoutSession[];
@@ -232,17 +256,123 @@ export const useDeleteWorkoutSession = () => {
     mutationFn: async (sessionId: string) => {
       const { error } = await supabase
         .from('workout_sessions')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('session_id', sessionId);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
-      toast.success('Workout session deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['deleted-workout-sessions'] });
+      toast.success('Workout session moved to bin');
     },
     onError: (error) => {
       toast.error('Failed to delete workout session');
+      console.error(error);
+    },
+  });
+};
+
+export const useRestoreWorkoutSession = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await supabase
+        .from('workout_sessions')
+        .update({ deleted_at: null })
+        .eq('session_id', sessionId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['deleted-workout-sessions'] });
+      toast.success('Workout session restored successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to restore workout session');
+      console.error(error);
+    },
+  });
+};
+
+export const usePermanentlyDeleteWorkoutSession = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      // First delete associated exercise logs
+      const { error: logsError } = await supabase
+        .from('exercise_logs')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      if (logsError) throw logsError;
+      
+      // Then delete the session
+      const { error } = await supabase
+        .from('workout_sessions')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deleted-workout-sessions'] });
+      toast.success('Workout session permanently deleted');
+    },
+    onError: (error) => {
+      toast.error('Failed to permanently delete workout session');
+      console.error(error);
+    },
+  });
+};
+
+export const useEmptyBin = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      // Get all deleted sessions
+      const { data: deletedSessions, error: fetchError } = await supabase
+        .from('workout_sessions')
+        .select('session_id')
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null);
+      
+      if (fetchError) throw fetchError;
+      if (!deletedSessions || deletedSessions.length === 0) return;
+      
+      const sessionIds = deletedSessions.map(s => s.session_id);
+      
+      // Delete all associated exercise logs
+      const { error: logsError } = await supabase
+        .from('exercise_logs')
+        .delete()
+        .in('session_id', sessionIds);
+      
+      if (logsError) throw logsError;
+      
+      // Delete all sessions
+      const { error } = await supabase
+        .from('workout_sessions')
+        .delete()
+        .in('session_id', sessionIds);
+      
+      if (error) throw error;
+      
+      return deletedSessions.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['deleted-workout-sessions'] });
+      toast.success(`Permanently deleted ${count} workout session${count !== 1 ? 's' : ''}`);
+    },
+    onError: (error) => {
+      toast.error('Failed to empty bin');
       console.error(error);
     },
   });
@@ -331,25 +461,27 @@ export const useProgressData = () => {
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      // Get workout sessions
+      // Get workout sessions (excluding deleted ones)
       const { data: sessions, error: sessionsError } = await supabase
         .from('workout_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'Done');
+        .eq('status', 'Done')
+        .is('deleted_at', null);
       
       if (sessionsError) throw sessionsError;
       
-      // Get exercise logs with exercise details
+      // Get exercise logs with exercise details (excluding deleted sessions)
       const { data: logs, error: logsError } = await supabase
         .from('exercise_logs')
         .select(`
           *,
-          workout_sessions!inner(user_id, date, status),
+          workout_sessions!inner(user_id, date, status, deleted_at),
           exercise:exercises(name, muscle_group, equipment)
         `)
         .eq('workout_sessions.user_id', user.id)
-        .eq('workout_sessions.status', 'Done');
+        .eq('workout_sessions.status', 'Done')
+        .is('workout_sessions.deleted_at', null);
       
       if (logsError) throw logsError;
       
@@ -366,18 +498,19 @@ export const useExportWorkoutData = () => {
     mutationFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      // Fetch all user data
+      // Fetch all user data (excluding deleted sessions)
       const [sessionsRes, goalsRes, logsRes] = await Promise.all([
-        supabase.from('workout_sessions').select('*').eq('user_id', user.id),
+        supabase.from('workout_sessions').select('*').eq('user_id', user.id).is('deleted_at', null),
         supabase.from('goals').select('*').eq('user_id', user.id),
         supabase
           .from('exercise_logs')
           .select(`
             *,
-            workout_sessions!inner(user_id),
+            workout_sessions!inner(user_id, deleted_at),
             exercise:exercises(name, muscle_group, equipment)
           `)
           .eq('workout_sessions.user_id', user.id)
+          .is('workout_sessions.deleted_at', null)
       ]);
       
       if (sessionsRes.error) throw sessionsRes.error;

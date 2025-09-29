@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Target, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, ChevronRight, Code, UserCheck, Shield, Flame, HelpCircle } from "lucide-react";
+import { Calendar, Target, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, ChevronRight, Code, UserCheck, Shield, Flame, HelpCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ const AppSidebar = () => {
     { icon: Book, label: "Exercises", path: "/dashboard/exercises" },
     { icon: Target, label: "Goals", path: "/dashboard/goals" },
     { icon: TrendingUp, label: "Progress", path: "/dashboard/progress" },
+    { icon: Trash2, label: "Bin", path: "/dashboard/bin" },
     { icon: HelpCircle, label: "Help", path: "/dashboard/help" },
   ];
 

@@ -31,6 +31,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import DynamicScrollLanding from "./pages/AppleScrollLanding";
+import Bin from "./pages/Bin";
 import { UnitPreferenceProvider } from "@/contexts/UnitPreferenceContext";
 
 const queryClient = new QueryClient();
@@ -86,6 +87,7 @@ const App = () => (
                                      <Route path="/goals/new" element={<Goals />} />
                                      <Route path="/help" element={<Help />} />
                                      <Route path="/settings" element={<Settings />} />
+                                     <Route path="/bin" element={<Bin />} />
                                      <Route path="*" element={<NotFound />} />
                                    </Routes>
                                 </div>

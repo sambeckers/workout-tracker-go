@@ -240,6 +240,7 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          deleted_at: string | null
           duration_minutes: number | null
           notes: string | null
           session_id: string
@@ -252,6 +253,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
+          deleted_at?: string | null
           duration_minutes?: number | null
           notes?: string | null
           session_id?: string
@@ -264,6 +266,7 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          deleted_at?: string | null
           duration_minutes?: number | null
           notes?: string | null
           session_id?: string
