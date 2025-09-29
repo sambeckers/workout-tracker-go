@@ -191,11 +191,29 @@ const WorkoutSession = () => {
 
       if (exercise.mode === 'time') {
         if (exercise.timeCompleted && exercise.durationSeconds) {
-          return {
+          // Convert duration to seconds based on unit
+          let durationInSeconds = exercise.durationSeconds;
+          if (exercise.duration_unit === 'min') {
+            durationInSeconds = exercise.durationSeconds * 60;
+          } else if (exercise.duration_unit === 'hr') {
+            durationInSeconds = exercise.durationSeconds * 3600;
+          }
+          
+          const logData: any = {
             ...baseLog,
-            duration_seconds: exercise.durationSeconds,
-            ...(exercise.metric_distance && exercise.distanceKm ? { distance_km: exercise.distanceKm } : {})
+            duration_seconds: durationInSeconds,
           };
+          
+          // Convert distance to km based on unit
+          if (exercise.metric_distance && exercise.distanceKm) {
+            let distanceInKm = exercise.distanceKm;
+            if (exercise.distance_unit === 'm') {
+              distanceInKm = exercise.distanceKm / 1000;
+            }
+            logData.distance_km = distanceInKm;
+          }
+          
+          return logData;
         }
       } else {
         const completedSets = exercise.sets.filter(s => s.completed);
@@ -221,7 +239,6 @@ const WorkoutSession = () => {
       return {
         ...baseLog,
         sets: 0,
-        ...(exercise.mode==='time' && exercise.metric_time && exercise.metric_distance && exercise.distanceKm ? { distance_km: exercise.distanceKm } : {})
       };
     }).filter(Boolean);
 
