@@ -34,7 +34,7 @@ export const useAutoSave = (options: AutoSaveOptions = {}) => {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
+      // Don't invalidate queries during autosave to prevent refetch overwriting local state
       onSuccess?.();
     },
     onError: (error) => {
@@ -51,6 +51,7 @@ export const useAutoSave = (options: AutoSaveOptions = {}) => {
       reps_per_set?: string;
       weight_per_set?: string;
       duration_seconds?: number;
+      distance_km?: number;
       exercise_order?: number;
       notes?: string;
     }>) => {
@@ -76,7 +77,7 @@ export const useAutoSave = (options: AutoSaveOptions = {}) => {
       return [];
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exercise-logs'] });
+      // Don't invalidate queries during autosave to prevent refetch overwriting local state
       onSuccess?.();
     },
     onError: (error) => {

@@ -237,14 +237,13 @@ const WorkoutSession = () => {
       };
 
       if (exercise.mode === 'time') {
-        if (exercise.timeCompleted && exercise.durationSeconds) {
-          // durationSeconds is already in canonical seconds, no conversion needed
+        // Save time-based exercise data (even if not completed yet)
+        if (exercise.durationSeconds || exercise.distanceKm) {
           const logData: any = {
             ...baseLog,
-            duration_seconds: exercise.durationSeconds,
+            duration_seconds: exercise.durationSeconds || 0,
           };
           
-          // distanceKm is already in canonical km, no conversion needed
           if (exercise.metric_distance && exercise.distanceKm) {
             logData.distance_km = exercise.distanceKm;
           }
@@ -252,19 +251,19 @@ const WorkoutSession = () => {
           return logData;
         }
       } else {
-        const completedSets = exercise.sets.filter(s => s.completed);
-        if (completedSets.length > 0) {
+        // Save all sets with current values (not just completed ones)
+        if (exercise.sets.length > 0) {
           const logData: any = {
             ...baseLog,
-            sets: completedSets.length,
+            sets: exercise.sets.length,
           };
           
           if (exercise.metric_reps) {
-            logData.reps_per_set = completedSets.map(s => s.reps).join(',');
+            logData.reps_per_set = exercise.sets.map(s => s.reps).join(',');
           }
           
           if (exercise.metric_weight) {
-            logData.weight_per_set = completedSets.map(s => s.weight).join(',');
+            logData.weight_per_set = exercise.sets.map(s => s.weight).join(',');
           }
           
           return logData;
