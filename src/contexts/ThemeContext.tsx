@@ -272,7 +272,7 @@ export const useTheme = () => {
   return context;
 };
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [currentPalette, setCurrentPalette] = useState(() => {
     return localStorage.getItem('workoutTracker_colorPalette') || 'fitness';
   });
@@ -326,4 +326,4 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
     </ThemeContext.Provider>
   );
-};
+}
