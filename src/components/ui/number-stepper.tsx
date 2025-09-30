@@ -29,7 +29,12 @@ export function NumberStepper({
   ariaLabel,
 }: NumberStepperProps) {
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
-  const apply = (n: number) => onChange(clamp(Math.round(n)));
+  const apply = (n: number) => {
+    // Determine decimal places based on step size
+    const decimalPlaces = step < 1 ? Math.max(0, -Math.floor(Math.log10(step))) : 0;
+    const rounded = parseFloat(n.toFixed(decimalPlaces));
+    onChange(clamp(rounded));
+  };
 
   const dec = () => apply((value || 0) - step);
   const inc = () => apply((value || 0) + step);
@@ -40,7 +45,15 @@ export function NumberStepper({
     const arr: number[] = [];
     // guard against massive ranges
     const safeMax = Math.min(max, min + 1000 * step);
-    for (let n = min; n <= safeMax; n += step) arr.push(Math.round(n));
+    
+    // Determine decimal places based on step size to avoid rounding errors
+    const decimalPlaces = step < 1 ? Math.max(0, -Math.floor(Math.log10(step))) : 0;
+    
+    for (let n = min; n <= safeMax; n += step) {
+      // Round to appropriate decimal places to avoid floating point precision issues
+      const rounded = parseFloat(n.toFixed(decimalPlaces));
+      arr.push(rounded);
+    }
     return arr;
   }, [min, max, step]);
 
