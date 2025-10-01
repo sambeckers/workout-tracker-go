@@ -33,7 +33,6 @@ import NotFound from "./pages/NotFound";
 import DynamicScrollLanding from "./pages/AppleScrollLanding";
 import Bin from "./pages/Bin";
 import { UnitPreferenceProvider } from "@/contexts/UnitPreferenceContext";
-import { DraftResumeFab } from '@/components/DraftResumeFab';
 
 const queryClient = new QueryClient();
 
@@ -73,26 +72,25 @@ const App = () => (
                             <AppSidebar />
                             <div className="flex-1 flex flex-col">
                               <CoverArea />
-                              <main className="flex-1 bg-white dark:bg-gray-900 relative">
+                              <main className="flex-1 bg-white dark:bg-gray-900">
                                 <div className="app-container py-6 sm:py-8 md:py-10">
-                                  <Routes>
-                                    <Route path="/" element={<Index />} />
-                                    <Route path="/schedule" element={<Schedule />} />
-                                    <Route path="/exercises" element={<Exercises />} />
-                                    <Route path="/goals" element={<Goals />} />
-                                    <Route path="/progress" element={<Progress />} />
-                                    <Route path="/workout/:id" element={<WorkoutSession />} />
-                                    <Route path="/workout/new" element={<WorkoutSession />} />
-                                    <Route path="/workout/quick" element={<WorkoutSession />} />
-                                    <Route path="/workout/plan" element={<WorkoutPlanner />} />
-                                    <Route path="/goals/new" element={<Goals />} />
-                                    <Route path="/help" element={<Help />} />
-                                    <Route path="/settings" element={<Settings />} />
-                                    <Route path="/bin" element={<Bin />} />
-                                    <Route path="*" element={<NotFound />} />
-                                  </Routes>
+                                   <Routes>
+                                     <Route path="/" element={<Index />} />
+                                     <Route path="/schedule" element={<Schedule />} />
+                                     <Route path="/exercises" element={<Exercises />} />
+                                     <Route path="/goals" element={<Goals />} />
+                                     <Route path="/progress" element={<Progress />} />
+                                     <Route path="/workout/:id" element={<WorkoutSession />} />
+                                     <Route path="/workout/new" element={<WorkoutSession />} />
+                                     <Route path="/workout/quick" element={<WorkoutSession />} />
+                                     <Route path="/workout/plan" element={<WorkoutPlanner />} />
+                                     <Route path="/goals/new" element={<Goals />} />
+                                     <Route path="/help" element={<Help />} />
+                                     <Route path="/settings" element={<Settings />} />
+                                     <Route path="/bin" element={<Bin />} />
+                                     <Route path="*" element={<NotFound />} />
+                                   </Routes>
                                 </div>
-                                <DraftResumeFab />
                               </main>
                             </div>
                           </div>
