@@ -17,7 +17,7 @@ interface NumberStepperProps {
   ariaLabel?: string;
 }
 
-export function NumberStepper({
+export const NumberStepper = React.memo(function NumberStepper({
   value,
   onChange,
   min = 0,
@@ -28,16 +28,16 @@ export function NumberStepper({
   className,
   ariaLabel,
 }: NumberStepperProps) {
-  const clamp = (n: number) => Math.max(min, Math.min(max, n));
-  const apply = (n: number) => {
-    // Determine decimal places based on step size
+  const clamp = React.useCallback((n: number) => Math.max(min, Math.min(max, n)), [min, max]);
+  
+  const apply = React.useCallback((n: number) => {
     const decimalPlaces = step < 1 ? Math.max(0, -Math.floor(Math.log10(step))) : 0;
     const rounded = parseFloat(n.toFixed(decimalPlaces));
     onChange(clamp(rounded));
-  };
+  }, [step, onChange, clamp]);
 
-  const dec = () => apply((value || 0) - step);
-  const inc = () => apply((value || 0) + step);
+  const dec = React.useCallback(() => apply((value || 0) - step), [apply, value, step]);
+  const inc = React.useCallback(() => apply((value || 0) + step), [apply, value, step]);
 
   const [open, setOpen] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement | null>(null);
@@ -59,17 +59,19 @@ export function NumberStepper({
 
   React.useEffect(() => {
     if (!open) return;
-    // Scroll currently selected into view
-    const el = listRef.current?.querySelector<HTMLButtonElement>(
-      `[data-value="${Number.isFinite(value) ? value : 0}"]`
-    );
-    el?.scrollIntoView({ block: 'center' });
-  }, [open, value]);
+    const timeoutId = setTimeout(() => {
+      const el = listRef.current?.querySelector<HTMLButtonElement>(
+        `[data-value="${Number.isFinite(value) ? value : 0}"]`
+      );
+      el?.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [open]);
 
-  const onPick = (n: number) => {
+  const onPick = React.useCallback((n: number) => {
     apply(n);
     setOpen(false);
-  };
+  }, [apply]);
 
   return (
     <div className={`flex items-center flex-wrap gap-2 min-w-0 ${className || ''}`} aria-label={ariaLabel}>
@@ -137,6 +139,6 @@ export function NumberStepper({
       {unit && <span className="text-sm text-muted-foreground select-none">{unit}</span>}
     </div>
   );
-}
+});
 
 export default NumberStepper;
