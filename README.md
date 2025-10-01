@@ -71,3 +71,17 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Workout Plan Drafts
+
+The app supports an auto-saved draft when creating a new workout plan:
+
+- While on `Dashboard > Plan Workout` your inputs (title, notes, selected exercises and their metrics) are auto-saved locally every few hundred milliseconds after changes.
+- If you navigate away (e.g. to Schedule or Progress) a floating "Draft Workout" resume panel appears at the bottom-right so you can quickly continue.
+- The panel shows workout title (or "Untitled Workout"), exercise count, and last updated time.
+- Click "Resume" to return to the planner; click the X to discard the draft.
+- Draft is automatically cleared after successfully saving the new workout (creating the session) or if you manually discard it.
+
+Storage key: `workout-planner-draft-v1` (localStorage; user/device scoped).
+
+If you later add multi-user sync, you can extend the `useWorkoutPlanDraft` hook to also POST the draft to a server.

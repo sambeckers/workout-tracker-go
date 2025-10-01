@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import NumberStepper from '@/components/ui/number-stepper';
 import { UnitToggle } from '@/components/ui/unit-toggle';
 import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseLogs, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
+import { useWorkoutPlanDraft } from '@/hooks/useWorkoutPlanDraft';
 import { toast } from 'sonner';
 import { format } from '@/lib/date-utils';
 
@@ -42,6 +43,8 @@ const WorkoutPlanner = () => {
   const createWorkoutMutation = useCreateWorkoutSession();
   const bulkLogsMutation = useBulkCreateExerciseLogs();
 
+  const { draft, updateDraft, clearDraft } = useWorkoutPlanDraft();
+
   const [workoutForm, setWorkoutForm] = useState({
     title: '',
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -57,8 +60,26 @@ const WorkoutPlanner = () => {
   const [recentExercises, setRecentExercises] = useState<string[]>([]);
   // Holds selections within the dialog before user confirms adding them
   const [pendingSelection, setPendingSelection] = useState<any[]>([]);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const { unit } = useUnitPreference();
   const useLbs = unit === 'lbs';
+
+    // Load draft on component mount
+  useEffect(() => {
+    if (draft && (draft.selectedExercises.length > 0 || draft?.workoutForm?.title || draft?.workoutForm?.notes)) {
+      console.log('Loading draft:', draft);
+      setWorkoutForm({
+        title: draft.workoutForm?.title || '',
+        notes: draft.workoutForm?.notes || '',
+        date: draft.workoutForm?.date || format(new Date(), 'yyyy-MM-dd'),
+        time: draft.workoutForm?.time || format(new Date(), 'HH:mm'),
+      });
+      setSelectedExercises(draft.selectedExercises || []);
+      setIsDraftLoaded(true);
+    } else {
+      setIsDraftLoaded(true);
+    }
+  }, [draft]);
 
   useEffect(() => {
     try {
@@ -138,10 +159,14 @@ const WorkoutPlanner = () => {
   };
 
   const updateExercise = (index: number, field: keyof SelectedExercise, value: any) => {
-    setSelectedExercises(selectedExercises.map((ex, i) => 
-      i === index ? { ...ex, [field]: value } : ex
-    ));
+    setSelectedExercises(prev => prev.map((ex, i) => i === index ? { ...ex, [field]: value } : ex));
   };
+
+  // Auto-save draft when form or exercises change (only for new plan, and only after draft is loaded)
+  useEffect(() => {
+    if (editingSessionId || !isDraftLoaded) return;
+    updateDraft({ workoutForm, selectedExercises });
+  }, [workoutForm, selectedExercises, editingSessionId, updateDraft, isDraftLoaded]);
 
   useEffect(() => {
     if (editingSessionId && sessions.length > 0) {
@@ -254,6 +279,8 @@ const WorkoutPlanner = () => {
           await bulkLogsMutation.mutateAsync(logsPayload as any);
           try { localStorage.setItem(`planned-exercises-${result.session_id}`, JSON.stringify(selectedExercises)); } catch {}
         }
+        // Clear draft after successful save of a new plan
+        clearDraft();
         toast.success('Workout planned successfully!');
         navigate(`/dashboard/workout/${result.session_id}`);
       }
