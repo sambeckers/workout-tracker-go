@@ -17,6 +17,9 @@ import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseL
 import { toast } from 'sonner';
 import { format } from '@/lib/date-utils';
 import { useDraftWorkout } from '@/hooks/useDraftWorkout';
+import { ExerciseProgressChart } from '@/components/progress/ExerciseProgressChart';
+import { convertKgToUnit, convertUnitToKg } from '@/lib/units';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SelectedExercise {
   exercise_id: string;
@@ -125,23 +128,73 @@ const WorkoutPlanner = () => {
     }
   };
 
-  const confirmAddSelectedExercises = () => {
+  const confirmAddSelectedExercises = async () => {
     if (pendingSelection.length === 0) {
       setExerciseDialogOpen(false);
       return;
     }
-    const newlyAdded: SelectedExercise[] = pendingSelection.map(exercise => ({
-      exercise_id: exercise.exercise_id,
-      name: exercise.name,
-      muscle_group: exercise.muscle_group,
-      target_sets: 3,
-      target_reps: '10',
-      notes: '',
-      target_weight: 20,
-      target_duration_sec: 0,
-      duration_unit: 'min' as const,
-      distance_unit: 'km' as const
-    }));
+    
+    // Fetch defaults for each exercise
+    const newlyAdded: SelectedExercise[] = await Promise.all(
+      pendingSelection.map(async (exercise) => {
+        let defaults = {
+          target_sets: 3,
+          target_reps: '10',
+          target_weight: 20,
+          target_duration_sec: 0,
+          target_distance_km: 0,
+        };
+
+        try {
+          // Fetch last log for this exercise
+          const { data } = await supabase
+            .from('exercise_logs')
+            .select(`
+              *,
+              session:workout_sessions!inner(
+                user_id,
+                status,
+                date
+              )
+            `)
+            .eq('exercise_id', exercise.exercise_id)
+            .eq('session.status', 'Done')
+            .order('session.date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (data) {
+            const sets = data.sets || defaults.target_sets;
+            const reps = data.reps_per_set || defaults.target_reps;
+            const weights = data.weight_per_set?.split(',').map((w: string) => parseFloat(w.trim())) || [];
+            const weight = weights.length > 0 ? weights[0] : defaults.target_weight;
+            const duration = data.duration_seconds || defaults.target_duration_sec;
+            const distance = data.distance_km || defaults.target_distance_km;
+
+            defaults = {
+              target_sets: sets,
+              target_reps: reps,
+              target_weight: weight,
+              target_duration_sec: duration,
+              target_distance_km: distance,
+            };
+          }
+        } catch (err) {
+          console.error('Error fetching exercise defaults:', err);
+        }
+
+        return {
+          exercise_id: exercise.exercise_id,
+          name: exercise.name,
+          muscle_group: exercise.muscle_group,
+          notes: '',
+          duration_unit: 'min' as const,
+          distance_unit: 'km' as const,
+          ...defaults,
+        };
+      })
+    );
+    
     const combined = [...selectedExercises, ...newlyAdded.filter(ne => !selectedExercises.some(se => se.exercise_id === ne.exercise_id))];
     setSelectedExercises(combined);
     // record recents
@@ -579,6 +632,7 @@ const WorkoutPlanner = () => {
                         const showDistance = exerciseData?.metric_distance === true;
                         
                          return (
+                           <>
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                              {/* Always show sets for weight/rep exercises */}
                              {(showReps || showWeight) && (
@@ -664,17 +718,30 @@ const WorkoutPlanner = () => {
                                 </div>
                               )}
                            </div>
+                           
+                           <div className="grid gap-2 mt-4">
+                             <Label className="text-sm">Exercise Notes</Label>
+                             <Input
+                               value={exercise.notes || ''}
+                               onChange={(e) => updateExercise(index, 'notes', e.target.value)}
+                               placeholder="Form cues, weight progression..."
+                             />
+                           </div>
+
+                           {/* Progress Chart */}
+                           <div className="mt-4">
+                             <ExerciseProgressChart
+                               exerciseId={exercise.exercise_id}
+                               exerciseName={exercise.name}
+                               metricWeight={exerciseData?.metric_weight}
+                               metricReps={exerciseData?.metric_reps}
+                               metricTime={exerciseData?.metric_time}
+                               metricDistance={exerciseData?.metric_distance}
+                             />
+                           </div>
+                           </>
                          );
                        })()}
-                       
-                       <div className="grid gap-2 mt-4">
-                         <Label className="text-sm">Exercise Notes</Label>
-                         <Input
-                           value={exercise.notes || ''}
-                           onChange={(e) => updateExercise(index, 'notes', e.target.value)}
-                           placeholder="Form cues, weight progression..."
-                         />
-                       </div>
                      </Card>
                   ))
                 )}
