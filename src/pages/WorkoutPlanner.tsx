@@ -16,6 +16,7 @@ import { UnitToggle } from '@/components/ui/unit-toggle';
 import { useExercises, useCreateWorkoutSession, useWorkoutSessions, useExerciseLogs, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
 import { toast } from 'sonner';
 import { format } from '@/lib/date-utils';
+import { useDraftWorkout } from '@/hooks/useDraftWorkout';
 
 interface SelectedExercise {
   exercise_id: string;
@@ -59,6 +60,7 @@ const WorkoutPlanner = () => {
   const [pendingSelection, setPendingSelection] = useState<any[]>([]);
   const { unit } = useUnitPreference();
   const useLbs = unit === 'lbs';
+  const { saveDraft, loadDraft, clearDraft } = useDraftWorkout();
 
   useEffect(() => {
     try {
@@ -68,6 +70,39 @@ const WorkoutPlanner = () => {
       if (Array.isArray(rec)) setRecentExercises(rec);
     } catch {}
   }, []);
+
+  // Load draft on mount
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft) {
+      // Only restore if matches current editing context or is new
+      const isMatchingContext = (!editingSessionId && !draft.editingSessionId) || 
+                                (editingSessionId && draft.editingSessionId === editingSessionId);
+      
+      if (isMatchingContext) {
+        setWorkoutForm(draft.workoutForm);
+        setSelectedExercises(draft.selectedExercises);
+        toast.info('Draft restored');
+      }
+    }
+  }, [loadDraft, editingSessionId]);
+
+  // Auto-save draft when form or exercises change
+  useEffect(() => {
+    // Don't save if completely empty
+    if (!workoutForm.title && selectedExercises.length === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      saveDraft({
+        workoutForm,
+        selectedExercises,
+        timestamp: Date.now(),
+        editingSessionId
+      });
+    }, 1000); // Debounce saves
+
+    return () => clearTimeout(timeoutId);
+  }, [workoutForm, selectedExercises, editingSessionId, saveDraft]);
 
   // Unique muscle groups for filter (supports multi-group entries)
   const uniqueMuscleGroups = useMemo(() => {
@@ -183,6 +218,9 @@ const WorkoutPlanner = () => {
     }
 
     try {
+      // Clear draft on successful save
+      clearDraft();
+
       if (editingSessionId) {
         // Just store planned exercises to localStorage for pickup by session editing flow
         if (selectedExercises.length > 0) {
@@ -259,6 +297,7 @@ const WorkoutPlanner = () => {
       }
     } catch (error) {
       toast.error('Failed to create workout');
+      // Don't clear draft on error, allow user to try again
     }
   };
 
