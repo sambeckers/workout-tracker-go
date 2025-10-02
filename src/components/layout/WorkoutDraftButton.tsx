@@ -5,7 +5,7 @@ import { useDraftWorkout } from '@/hooks/useDraftWorkout';
 import { useLocation } from 'react-router-dom';
 
 export const WorkoutDraftButton = () => {
-  const { hasDraft, resumeDraft, clearDraft } = useDraftWorkout();
+  const { hasDraft, resumeDraft, clearDraft, checkDraft } = useDraftWorkout();
   const [show, setShow] = useState(false);
   const location = useLocation();
   
@@ -15,6 +15,14 @@ export const WorkoutDraftButton = () => {
   useEffect(() => {
     setShow(hasDraft && !isOnPlannerPage);
   }, [hasDraft, isOnPlannerPage]);
+
+  // Periodically check for draft changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkDraft();
+    }, 500);
+    return () => clearInterval(interval);
+  }, [checkDraft]);
 
   if (!show) return null;
 
