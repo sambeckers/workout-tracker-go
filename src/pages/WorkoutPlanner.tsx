@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ interface SelectedExercise {
 }
 
 const WorkoutPlanner = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -146,38 +148,41 @@ const WorkoutPlanner = () => {
         };
 
         try {
-          // Fetch last log for this exercise
-          const { data } = await supabase
-            .from('exercise_logs')
-            .select(`
-              *,
-              session:workout_sessions!inner(
-                user_id,
-                status,
-                date
-              )
-            `)
-            .eq('exercise_id', exercise.exercise_id)
-            .eq('session.status', 'Done')
-            .order('session.date', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // Fetch last log for this exercise for the current user
+          if (user?.id) {
+            const { data } = await supabase
+              .from('exercise_logs')
+              .select(`
+                *,
+                session:workout_sessions!inner(
+                  user_id,
+                  status,
+                  date
+                )
+              `)
+              .eq('exercise_id', exercise.exercise_id)
+              .eq('session.user_id', user.id)
+              .eq('session.status', 'Done')
+              .order('session.date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          if (data) {
-            const sets = data.sets || defaults.target_sets;
-            const reps = data.reps_per_set || defaults.target_reps;
-            const weights = data.weight_per_set?.split(',').map((w: string) => parseFloat(w.trim())) || [];
-            const weight = weights.length > 0 ? weights[0] : defaults.target_weight;
-            const duration = data.duration_seconds || defaults.target_duration_sec;
-            const distance = data.distance_km || defaults.target_distance_km;
+            if (data) {
+              const sets = data.sets || defaults.target_sets;
+              const reps = data.reps_per_set || defaults.target_reps;
+              const weights = data.weight_per_set?.split(',').map((w: string) => parseFloat(w.trim())) || [];
+              const weight = weights.length > 0 ? weights[0] : defaults.target_weight;
+              const duration = data.duration_seconds || defaults.target_duration_sec;
+              const distance = data.distance_km || defaults.target_distance_km;
 
-            defaults = {
-              target_sets: sets,
-              target_reps: reps,
-              target_weight: weight,
-              target_duration_sec: duration,
-              target_distance_km: distance,
-            };
+              defaults = {
+                target_sets: sets,
+                target_reps: reps,
+                target_weight: weight,
+                target_duration_sec: duration,
+                target_distance_km: distance,
+              };
+            }
           }
         } catch (err) {
           console.error('Error fetching exercise defaults:', err);

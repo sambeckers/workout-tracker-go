@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const WeightliftingAnalytics = React.lazy(() => import('@/components/progress/WeightliftingAnalytics'));
 const CardioAnalytics = React.lazy(() => import('@/components/progress/CardioAnalytics'));
+const ExerciseProgressList = React.lazy(() => import('@/components/progress/ExerciseProgressList').then(m => ({ default: m.ExerciseProgressList })));
 
 const AnalyticsSkeleton: React.FC = () => (
   <div className="space-y-6 animate-pulse">
@@ -176,6 +177,7 @@ const Progress = () => {
         <TabsList>
           <TabsTrigger value="weightlifting">Weightlifting</TabsTrigger>
           <TabsTrigger value="cardio">Cardio</TabsTrigger>
+          <TabsTrigger value="exercises">Exercise Progress</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
         <TabsContent value="weightlifting" className="space-y-8">
@@ -192,6 +194,11 @@ const Progress = () => {
           </div>
           <React.Suspense fallback={<AnalyticsSkeleton />}> 
             <CardioAnalytics logs={logs} sessions={sessions} />
+          </React.Suspense>
+        </TabsContent>
+        <TabsContent value="exercises" className="space-y-8">
+          <React.Suspense fallback={<AnalyticsSkeleton />}>
+            <ExerciseProgressList logs={logs} />
           </React.Suspense>
         </TabsContent>
         <TabsContent value="summary" className="space-y-8">
