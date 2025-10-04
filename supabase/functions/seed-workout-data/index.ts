@@ -147,11 +147,22 @@ Deno.serve(async (req) => {
         }
 
         if (exercise.metric_time) {
-          // Timed exercise
-          const duration = Math.floor(exerciseProgress[exerciseId].duration * (exercise.metric_distance ? progressFactor * 0.95 : 1) * variance);
-          log.duration_seconds = duration;
-          log.duration_unit = 'seconds';
-          exerciseProgress[exerciseId].duration = duration;
+          // Timed exercise - convert to appropriate unit
+          const durationSec = Math.floor(exerciseProgress[exerciseId].duration * (exercise.metric_distance ? progressFactor * 0.95 : 1) * variance);
+          
+          // Use minutes for most exercises, hours for very long durations
+          if (durationSec > 3600) {
+            log.duration_seconds = Math.floor(durationSec / 3600);
+            log.duration_unit = 'hr';
+          } else if (durationSec > 60) {
+            log.duration_seconds = Math.floor(durationSec / 60);
+            log.duration_unit = 'min';
+          } else {
+            log.duration_seconds = durationSec;
+            log.duration_unit = 'sec';
+          }
+          
+          exerciseProgress[exerciseId].duration = durationSec;
         }
 
         const { error: logError } = await supabaseClient
