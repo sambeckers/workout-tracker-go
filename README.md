@@ -71,3 +71,32 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Progressive Defaults & Per-Exercise Progress
+
+The workout planner now auto-fills each newly added exercise with intelligent starting values:
+
+- Strength: Last top-set weight, average reps, prior set count (or sensible defaults: 3 x 10 @ 20kg)
+- Bodyweight: Last average reps (or 10)
+- Cardio (distance + time): Last distance and duration (fallback 5km / 30min)
+- Duration-only (plank / holds): Last duration (fallback 30–60s)
+
+Additionally, each exercise displays a compact sparkline (toggleable metric when applicable):
+
+- Strength: Max Weight (default) ↔ Volume toggle
+- Cardio: Distance (default) ↔ Pace (min/km) toggle
+- Bodyweight: Total Reps progression
+- Duration: Duration (minutes)
+
+Progression Suggestions (internal): Logic scaffolding is in place to surface lightweight suggestions (e.g., +2.5% load, -2% pace). These can be surfaced in the UI later.
+
+Implementation Highlights:
+- Central metric classification utility: `src/lib/metrics.ts`
+- Progressive defaults derivation: `deriveProgressiveDefaults()`
+- Exercise prefill integration inside `WorkoutPlanner` confirm add flow
+- Reusable chart component: `ExerciseProgressChart` with mode toggles
+
+Limitations / Next Ideas:
+- Surface suggestions directly under exercise inputs
+- Allow user preference for default chart mode (volume vs weight, pace vs distance)
+- Personal best markers & trend percentage badges

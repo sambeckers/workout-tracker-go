@@ -476,12 +476,12 @@ export const useProgressData = () => {
         .from('exercise_logs')
         .select(`
           *,
-          workout_sessions!inner(user_id, date, status, deleted_at),
-          exercise:exercises(name, muscle_group, equipment)
+          session:workout_sessions!inner(user_id, date, status, deleted_at),
+          exercise:exercises(name, muscle_group, equipment, metric_weight, metric_reps, metric_time, metric_distance)
         `)
-        .eq('workout_sessions.user_id', user.id)
-        .eq('workout_sessions.status', 'Done')
-        .is('workout_sessions.deleted_at', null);
+        .eq('session.user_id', user.id)
+        .eq('session.status', 'Done')
+        .is('session.deleted_at', null);
       
       if (logsError) throw logsError;
       

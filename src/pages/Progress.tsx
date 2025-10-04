@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Calendar, Download, Activity, Target, Dumbbell } from 'lucide-react';
-import { useProgressData, useExportWorkoutData } from '@/hooks/useWorkoutData';
+import { useProgressData, useExportWorkoutData, useExercises } from '@/hooks/useWorkoutData';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -10,6 +10,10 @@ import { ProgressOverview } from '@/components/progress/ProgressOverview';
 import { MuscleGroupProgress } from '@/components/progress/MuscleGroupProgress';
 import { MetricsTimeline } from '@/components/progress/MetricsTimeline';
 import { RecentWorkouts } from '@/components/progress/RecentWorkouts';
+import { ProgressSummaryTiles } from '@/components/progress/ProgressSummaryTiles';
+import { WeightliftingDashboard } from '@/components/progress/WeightliftingDashboard';
+import { CardioDashboard } from '@/components/progress/CardioDashboard';
+import { WorkoutHistoryList } from '@/components/progress/WorkoutHistoryList';
 
 const LoadingSkeleton: React.FC = () => (
   <div className="space-y-6 animate-pulse">
@@ -30,15 +34,36 @@ const Progress = () => {
   const navigate = useNavigate();
   const { data: progressData, isLoading } = useProgressData();
   const exportDataMutation = useExportWorkoutData();
-  const [activeTab, setActiveTab] = React.useState<string>(() => {
-    if (typeof window === 'undefined') return 'overview';
-    return localStorage.getItem('progress.activeTab') || 'overview';
+  const { data: exercises = [] } = useExercises();
+  const [range, setRange] = React.useState<'30d'|'90d'|'all'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('progress.range');
+      if (stored === '30d' || stored === '90d' || stored === 'all') return stored;
+    }
+    return '90d';
   });
-  
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    try { localStorage.setItem('progress.activeTab', value); } catch {}
-  };
+  const now = React.useMemo(()=> new Date(), []);
+  const cutoff = React.useMemo(() => {
+    if (range === '30d') { const d = new Date(now); d.setDate(d.getDate()-30); return d; }
+    if (range === '90d') { const d = new Date(now); d.setDate(d.getDate()-90); return d; }
+    return null;
+  }, [range, now]);
+  const { sessions = [], logs = [] } = progressData || {};
+  // range filtering moved below sessions/logs declaration
+  const filteredSessions = React.useMemo(()=> {
+    if (!cutoff) return sessions;
+    return sessions.filter(s => new Date(s.date) >= cutoff);
+  }, [sessions, cutoff]);
+  const filteredLogs = React.useMemo(()=> {
+    if (!cutoff) return logs;
+    return logs.filter(l => {
+      const dt = (l as any).session?.date || (l as any).created_at || (l as any).date;
+      return dt && new Date(dt) >= cutoff;
+    });
+  }, [logs, cutoff]);
+  const updateRange = (val: '30d'|'90d'|'all') => { setRange(val); try { localStorage.setItem('progress.range', val); } catch {} };
+  const noSessions = filteredSessions.length === 0;
+  const noLogs = filteredLogs.length === 0;
 
   if (!user) {
     return (
@@ -66,75 +91,75 @@ const Progress = () => {
     );
   }
 
-  const { sessions = [], logs = [] } = progressData || {};
-
   return (
-    <div className="app-container p-4 md:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <TrendingUp className="h-8 w-8 text-primary" />
-            Progress & Analytics
-          </h1>
-          <p className="text-muted-foreground mt-2">Track your fitness journey across all metrics</p>
+    <div className="app-container p-4 md:p-8 space-y-10">
+      <div>
+        <div className="flex flex-wrap gap-2 items-center mb-2">
+          <h1 className="text-3xl font-bold mb-2 sm:mb-0">Progress Dashboard</h1>
+          <div className="ml-auto flex gap-2" aria-label="Date range selector">
+            {['30d','90d','all'].map(r => (
+              <Button key={r} size="sm" variant={range===r?'default':'outline'} aria-pressed={range===r} onClick={()=>updateRange(r as any)}>{r}</Button>
+            ))}
+          </div>
         </div>
-        <Button 
-          variant="outline" 
-          className="flex items-center gap-2"
-          onClick={() => exportDataMutation.mutate()}
-          disabled={exportDataMutation.isPending}
-        >
-          <Download className="h-4 w-4" />
-          Export Data
-        </Button>
+        <p className="text-muted-foreground">Track lifting, cardio, and session history.</p>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="muscles" className="flex items-center gap-2">
-            <Dumbbell className="h-4 w-4" />
-            <span className="hidden sm:inline">By Muscle</span>
-          </TabsTrigger>
-          <TabsTrigger value="timeline" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Timeline</span>
-          </TabsTrigger>
-          <TabsTrigger value="workouts" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Workouts</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Summary */}
+      <section className="space-y-4" aria-labelledby="summary-heading">
+        <h2 id="summary-heading" className="text-xl font-semibold">Summary</h2>
+        {noSessions && noLogs ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No workout data in this range. Try expanding the range or logging a new session.
+            </CardContent>
+          </Card>
+        ) : (
+          <ProgressSummaryTiles sessions={filteredSessions} logs={filteredLogs} />
+        )}
+      </section>
 
-        <TabsContent value="overview" className="space-y-6">
-          <React.Suspense fallback={<LoadingSkeleton />}>
-            <ProgressOverview sessions={sessions} logs={logs} />
-          </React.Suspense>
-        </TabsContent>
+      {/* Weightlifting */}
+      <section className="space-y-4" aria-labelledby="weightlifting-heading">
+        <h2 id="weightlifting-heading" className="text-xl font-semibold">Weightlifting</h2>
+        {noLogs ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No strength log entries in this range.
+            </CardContent>
+          </Card>
+        ) : (
+          <WeightliftingDashboard logs={filteredLogs as any} exercises={exercises as any} />
+        )}
+      </section>
 
-        <TabsContent value="muscles" className="space-y-6">
-          <React.Suspense fallback={<LoadingSkeleton />}>
-            <MuscleGroupProgress logs={logs} sessions={sessions} />
-          </React.Suspense>
-        </TabsContent>
+      {/* Cardio */}
+      <section className="space-y-4" aria-labelledby="cardio-heading">
+        <h2 id="cardio-heading" className="text-xl font-semibold">Cardio</h2>
+        {noLogs ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No cardio log entries in this range.
+            </CardContent>
+          </Card>
+        ) : (
+          <CardioDashboard logs={filteredLogs as any} exercises={exercises as any} />
+        )}
+      </section>
 
-        <TabsContent value="timeline" className="space-y-6">
-          <React.Suspense fallback={<LoadingSkeleton />}>
-            <MetricsTimeline sessions={sessions} logs={logs} />
-          </React.Suspense>
-        </TabsContent>
-
-        <TabsContent value="workouts" className="space-y-6">
-          <React.Suspense fallback={<LoadingSkeleton />}>
-            <RecentWorkouts sessions={sessions} logs={logs} navigate={navigate} />
-          </React.Suspense>
-        </TabsContent>
-      </Tabs>
+      {/* History */}
+      <section className="space-y-4" aria-labelledby="history-heading">
+        <h2 id="history-heading" className="text-xl font-semibold">Workout History</h2>
+        {noSessions ? (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              No completed sessions in this range.
+            </CardContent>
+          </Card>
+        ) : (
+          <WorkoutHistoryList sessions={filteredSessions as any} logs={filteredLogs as any} exercises={exercises as any} />
+        )}
+      </section>
     </div>
   );
 };

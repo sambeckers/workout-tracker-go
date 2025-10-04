@@ -21,6 +21,7 @@ import { useDraftWorkout } from '@/hooks/useDraftWorkout';
 import { ExerciseProgressChart } from '@/components/progress/ExerciseProgressChart';
 import { convertKgToUnit, convertUnitToKg } from '@/lib/units';
 import { supabase } from '@/integrations/supabase/client';
+import { classifyExercise, deriveProgressiveDefaults } from '@/lib/metrics';
 
 interface SelectedExercise {
   exercise_id: string;
@@ -34,6 +35,7 @@ interface SelectedExercise {
   target_distance_km?: number; // for distance-based exercises
   duration_unit?: 'sec' | 'min' | 'hr';
   distance_unit?: 'm' | 'km';
+  suggestion?: string; // progressive suggestion text
 }
 
 const WorkoutPlanner = () => {
@@ -135,74 +137,65 @@ const WorkoutPlanner = () => {
       setExerciseDialogOpen(false);
       return;
     }
-    
-    // Fetch defaults for each exercise
+
     const newlyAdded: SelectedExercise[] = await Promise.all(
       pendingSelection.map(async (exercise) => {
-        let defaults = {
-          target_sets: 3,
-          target_reps: '10',
-          target_weight: 20,
-          target_duration_sec: 0,
-          target_distance_km: 0,
-        };
-
+        // Base defaults depending on classification
+        const profile = classifyExercise(exercise);
+        let lastLog: any = null;
         try {
-          // Fetch last log for this exercise for the current user
           if (user?.id) {
             const { data } = await supabase
               .from('exercise_logs')
-              .select(`
-                *,
-                session:workout_sessions!inner(
-                  user_id,
-                  status,
-                  date
-                )
-              `)
+              .select(`*, session:workout_sessions!inner(user_id,status,date)`) // narrow fields
               .eq('exercise_id', exercise.exercise_id)
               .eq('session.user_id', user.id)
               .eq('session.status', 'Done')
               .order('session.date', { ascending: false })
               .limit(1)
               .maybeSingle();
-
-            if (data) {
-              const sets = data.sets || defaults.target_sets;
-              const reps = data.reps_per_set || defaults.target_reps;
-              const weights = data.weight_per_set?.split(',').map((w: string) => parseFloat(w.trim())) || [];
-              const weight = weights.length > 0 ? weights[0] : defaults.target_weight;
-              const duration = data.duration_seconds || defaults.target_duration_sec;
-              const distance = data.distance_km || defaults.target_distance_km;
-
-              defaults = {
-                target_sets: sets,
-                target_reps: reps,
-                target_weight: weight,
-                target_duration_sec: duration,
-                target_distance_km: distance,
-              };
-            }
+            if (data) lastLog = data;
           }
-        } catch (err) {
-          console.error('Error fetching exercise defaults:', err);
+        } catch (e) {
+          console.error('Prefill last log error', e);
         }
+        const progressive = deriveProgressiveDefaults(profile, lastLog);
 
-        return {
+        const base: SelectedExercise = {
           exercise_id: exercise.exercise_id,
           name: exercise.name,
           muscle_group: exercise.muscle_group,
           notes: '',
-          duration_unit: 'min' as const,
-          distance_unit: 'km' as const,
-          ...defaults,
+          target_sets: progressive.target_sets ?? 3,
+          target_reps: progressive.target_reps ?? '10',
+          target_weight: progressive.target_weight,
+          target_duration_sec: progressive.target_duration_sec,
+          target_distance_km: progressive.target_distance_km,
+          duration_unit: 'min',
+          distance_unit: 'km',
+          suggestion: progressive.suggestion
         };
+
+        // Remove irrelevant strength fields for pure cardio / duration types to avoid confusion in summary
+        if (profile.type === 'cardio' || profile.type === 'duration') {
+          base.target_sets = base.target_sets || 0; // not displayed if 0 later, can adjust
+          base.target_reps = profile.type === 'cardio' ? (base.target_reps || '0') : base.target_reps || '0';
+          // weight not relevant
+          delete (base as any).target_weight;
+        } else if (profile.type === 'bodyweight') {
+          // weight irrelevant
+          delete (base as any).target_weight;
+        }
+        // Suggestion (stretch) is currently unused in UI; could surface later
+        return base;
       })
     );
-    
-    const combined = [...selectedExercises, ...newlyAdded.filter(ne => !selectedExercises.some(se => se.exercise_id === ne.exercise_id))];
+
+    const combined = [
+      ...selectedExercises,
+      ...newlyAdded.filter(ne => !selectedExercises.some(se => se.exercise_id === ne.exercise_id))
+    ];
     setSelectedExercises(combined);
-    // record recents
     try {
       const next = [
         ...newlyAdded.map(e => e.exercise_id),
@@ -731,6 +724,9 @@ const WorkoutPlanner = () => {
                                onChange={(e) => updateExercise(index, 'notes', e.target.value)}
                                placeholder="Form cues, weight progression..."
                              />
+                             {exercise.suggestion && (
+                               <p className="text-xs text-muted-foreground mt-1">Suggestion: {exercise.suggestion}</p>
+                             )}
                            </div>
 
                            {/* Progress Chart */}
@@ -785,12 +781,45 @@ const WorkoutPlanner = () => {
                 <div className="pt-4 border-t">
                   <h4 className="text-sm font-medium mb-2">Exercise List:</h4>
                   <div className="space-y-1">
-                    {selectedExercises.map((ex, i) => (
-                      <div key={i} className="text-sm text-muted-foreground">
-                        {ex.target_sets} sets × {ex.target_reps} reps @ {useLbs ? Math.round((ex.target_weight||0)*2.20462) : ex.target_weight || 0} {useLbs ? 'lbs' : 'kg'}
-                        <div className="font-medium text-xs">{ex.name}</div>
-                      </div>
-                    ))}
+                    {selectedExercises.map((ex, i) => {
+                      const exerciseData = exercises.find(e => e.exercise_id === ex.exercise_id);
+                      const weightEnabled = exerciseData?.metric_weight;
+                      const repsEnabled = exerciseData?.metric_reps;
+                      const timeEnabled = exerciseData?.metric_time;
+                      const distanceEnabled = exerciseData?.metric_distance;
+
+                      let line = '';
+                      if ((weightEnabled || repsEnabled) && !timeEnabled && !distanceEnabled) {
+                        line = `${ex.target_sets} x ${ex.target_reps}${weightEnabled ? ` @ ${useLbs ? Math.round((ex.target_weight||0)*2.20462) : ex.target_weight || 0} ${useLbs ? 'lbs' : 'kg'}` : ''}`;
+                      } else if (distanceEnabled && timeEnabled) {
+                        // cardio combined
+                        if (ex.target_distance_km && ex.target_duration_sec) {
+                          const mins = ex.target_duration_sec / 60;
+                          const pace = ex.target_distance_km > 0 ? mins / ex.target_distance_km : 0;
+                          const paceMin = Math.floor(pace);
+                          const paceSec = Math.round((pace - paceMin) * 60).toString().padStart(2,'0');
+                          line = `${ex.target_distance_km} km in ${Math.round(mins)} min (pace ${paceMin}:${paceSec}/km)`;
+                        } else if (ex.target_distance_km) {
+                          line = `${ex.target_distance_km} km`;
+                        } else if (ex.target_duration_sec) {
+                          line = `${Math.round(ex.target_duration_sec/60)} min`; 
+                        }
+                      } else if (timeEnabled && !distanceEnabled) {
+                        if (ex.target_duration_sec) {
+                          line = `${ex.target_duration_sec < 600 ? ex.target_duration_sec + 's' : Math.round(ex.target_duration_sec/60)+' min'}`;
+                        }
+                      } else if (!weightEnabled && repsEnabled && !timeEnabled && !distanceEnabled) {
+                        line = `${ex.target_sets} x ${ex.target_reps}`;
+                      } else {
+                        line = `${ex.target_sets} sets`;
+                      }
+                      return (
+                        <div key={i} className="text-sm text-muted-foreground">
+                          {line}
+                          <div className="font-medium text-xs">{ex.name}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
