@@ -11,6 +11,7 @@ interface NumberStepperProps {
   min?: number;
   max?: number;
   step?: number;
+  buttonStep?: number; // Separate step for +/- buttons (quick adjustments)
   disabled?: boolean;
   unit?: string;
   className?: string;
@@ -23,6 +24,7 @@ export function NumberStepper({
   min = 0,
   max = Number.MAX_SAFE_INTEGER,
   step = 1,
+  buttonStep, // If not provided, falls back to step
   disabled,
   unit,
   className,
@@ -30,17 +32,22 @@ export function NumberStepper({
 }: NumberStepperProps) {
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const apply = (n: number) => {
-    // Determine decimal places based on step size
+    // Determine decimal places based on step size (for dropdown precision)
     const decimalPlaces = step < 1 ? Math.max(0, -Math.floor(Math.log10(step))) : 0;
     const rounded = parseFloat(n.toFixed(decimalPlaces));
     onChange(clamp(rounded));
   };
 
-  const dec = () => apply((value || 0) - step);
-  const inc = () => apply((value || 0) + step);
+  const actualButtonStep = buttonStep ?? step;
+  const dec = () => apply((value || 0) - actualButtonStep);
+  const inc = () => apply((value || 0) + actualButtonStep);
 
   const [open, setOpen] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState('');
+  const [isEditing, setIsEditing] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement | null>(null);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  
   const numbers = React.useMemo(() => {
     const arr: number[] = [];
     // guard against massive ranges
@@ -59,16 +66,64 @@ export function NumberStepper({
 
   React.useEffect(() => {
     if (!open) return;
-    // Scroll currently selected into view
-    const el = listRef.current?.querySelector<HTMLButtonElement>(
-      `[data-value="${Number.isFinite(value) ? value : 0}"]`
-    );
-    el?.scrollIntoView({ block: 'center' });
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      const el = listRef.current?.querySelector<HTMLButtonElement>(
+        `[data-value="${Number.isFinite(value) ? value : 0}"]`
+      );
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+      }
+    }, 10);
+    return () => clearTimeout(timer);
   }, [open, value]);
 
   const onPick = (n: number) => {
     apply(n);
     setOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    setIsEditing(false);
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed)) {
+      apply(parsed);
+    }
+    setInputValue('');
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleInputBlur();
+      setOpen(false);
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setInputValue('');
+      setOpen(false);
+    }
+  };
+
+  const handleInputFocus = () => {
+    setIsEditing(true);
+    setInputValue(String(Number.isFinite(value) ? value : 0));
+    setTimeout(() => inputRef.current?.select(), 10);
+  };
+
+  const handlePopoverTriggerClick = () => {
+    if (disabled) return;
+    setOpen(true);
+    // Immediately focus and prepare for typing
+    setIsEditing(true);
+    setInputValue(String(Number.isFinite(value) ? value : 0));
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 50);
   };
 
   return (
@@ -89,15 +144,21 @@ export function NumberStepper({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="w-20 sm:w-24 h-10 text-center outline-none"
-              onClick={() => !disabled && setOpen(true)}
+              className="w-20 sm:w-24 h-10 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              onClick={handlePopoverTriggerClick}
               aria-label="open number picker"
             >
               <Input
-                readOnly
-                value={Number.isFinite(value) ? value : 0}
-                className="w-20 sm:w-24 h-10 border-0 text-center pointer-events-none"
+                ref={inputRef}
+                value={isEditing ? inputValue : (Number.isFinite(value) ? value : 0)}
+                onChange={handleInputChange}
+                onBlur={handleInputBlur}
+                onKeyDown={handleInputKeyDown}
+                onFocus={handleInputFocus}
+                className="w-20 sm:w-24 h-10 border-0 text-center"
                 disabled={disabled}
+                type="text"
+                inputMode="decimal"
               />
             </button>
           </PopoverTrigger>

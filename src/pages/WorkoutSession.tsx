@@ -455,9 +455,44 @@ const WorkoutSession = () => {
   const totalSets = exercises.reduce((t,ex)=>(ex.mode||'sets')==='time'?t+1:t+ex.sets.length,0);
 
   // Auto status change
-  useEffect(()=>{ if(!currentWorkout || updateSession.isPending) return; if(totalSets>0 && completedSets===totalSets && currentWorkout.status!=='Done' && !autoMarkedDoneRef.current){ autoMarkedDoneRef.current=true; updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Done' } }, { onSuccess:()=>{ confetti({ particleCount:80, spread:55, origin:{y:0.3} }); toast.success('All sets complete. Marked as Done'); } }); } }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id]);
-  useEffect(()=>{ if(!currentWorkout || updateSession.isPending) return; if(totalSets===0) return; if(completedSets < totalSets && currentWorkout.status==='Done'){ updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Planned' } }, { onSuccess:()=>toast('Marked as Planned') }); autoMarkedDoneRef.current=false; } }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id]);
-  const toggleWorkoutStatus=()=>{ if(!currentWorkout) return; const next=currentWorkout.status==='Done'?'Planned':'Done'; updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { onSuccess:()=>{ if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); } }); };
+  // Auto mark as Done when all sets/time items complete (sets all completed AFTER last action)
+  useEffect(()=>{ 
+    if(!currentWorkout || updateSession.isPending) return; 
+    if(totalSets>0 && completedSets===totalSets && currentWorkout.status!=='Done' && !autoMarkedDoneRef.current){ 
+      autoMarkedDoneRef.current=true; // flag so we know this was automatic
+      updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Done' } }, { 
+        onSuccess:()=>{ 
+          confetti({ particleCount:80, spread:55, origin:{y:0.3} }); 
+          toast.success('All sets complete. Marked as Done'); 
+        } 
+      }); 
+    } 
+  }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id,updateSession.isPending]);
+
+  // Only auto-revert to Planned if the status was previously auto-marked Done and user starts undoing sets
+  useEffect(()=>{ 
+    if(!currentWorkout || updateSession.isPending) return; 
+    if(totalSets===0) return; 
+    // Require that the Done status originated from the auto-complete flow
+    if(completedSets < totalSets && currentWorkout.status==='Done' && autoMarkedDoneRef.current){ 
+      updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Planned' } }, { 
+        onSuccess:()=>toast('Marked as Planned') 
+      }); 
+      autoMarkedDoneRef.current=false; 
+    } 
+  }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id,updateSession.isPending]);
+
+  const toggleWorkoutStatus=()=>{ 
+    if(!currentWorkout) return; 
+    const next=currentWorkout.status==='Done'?'Planned':'Done';
+    // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
+    autoMarkedDoneRef.current=false; 
+    updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { 
+      onSuccess:()=>{ 
+        if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
+      } 
+    }); 
+  };
 
   const formatTime=(s:number)=>{ const m=Math.floor(s/60); const sec=s%60; return `${m}:${sec.toString().padStart(2,'0')}`; };
   const uniqueMuscleGroups = Array.from(new Set(availableExercises.flatMap(ex=>(ex.muscle_group||'').split(',').map(g=>g.trim()).filter(Boolean)))).sort();

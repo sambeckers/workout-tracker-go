@@ -30,6 +30,7 @@ const Schedule = () => {
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [muscleFilter, setMuscleFilter] = useState<string>('all');
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<Set<string>>(new Set());
+  const [updatingSessionId, setUpdatingSessionId] = useState<string | null>(null);
 
   const uniqueMuscleGroups = useMemo(() => {
     const set = new Set<string>();
@@ -113,13 +114,19 @@ const Schedule = () => {
   };
 
   const handleToggleWorkoutStatus = (sessionId: string, currentStatus: string) => {
+    if (updatingSessionId) return; // Prevent multiple simultaneous updates
+    
     const markingDone = currentStatus !== 'Done';
     const newStatus = markingDone ? 'Done' : 'Planned';
+    
+    setUpdatingSessionId(sessionId);
+    
     updateWorkoutMutation.mutate({
       sessionId,
       data: { status: newStatus }
     }, {
       onSuccess: () => {
+        setUpdatingSessionId(null);
         if (markingDone) {
           // Light celebratory confetti
           confetti({
@@ -128,6 +135,9 @@ const Schedule = () => {
             origin: { y: 0.3 }
           });
         }
+      },
+      onError: () => {
+        setUpdatingSessionId(null);
       }
     });
   };
@@ -353,7 +363,7 @@ const Schedule = () => {
                   <Button
                     size="sm"
                     onClick={() => handleToggleWorkoutStatus(workout.session_id, workout.status)}
-                    disabled={updateWorkoutMutation.isPending}
+                    disabled={updatingSessionId === workout.session_id}
                     variant="outline"
                     className={workout.status === 'Done' ? 'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20' : 'flex items-center gap-2'}
                     title={workout.status === 'Done' ? 'Click to mark as planned' : 'Click to mark as done'}
@@ -424,7 +434,7 @@ const Schedule = () => {
                       <Button
                         size="sm"
                         onClick={() => handleToggleWorkoutStatus(w.session_id, w.status)}
-                        disabled={updateWorkoutMutation.isPending}
+                        disabled={updatingSessionId === w.session_id}
                         variant="outline"
                         className={w.status === 'Done' ? 'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20' : ''}
                         title={w.status === 'Done' ? 'Click to mark as planned' : 'Click to mark as done'}

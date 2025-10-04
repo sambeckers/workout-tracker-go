@@ -747,8 +747,9 @@ const WorkoutPlanner = () => {
                                    value={useLbs ? Math.round((exercise.target_weight||0)*2.20462*2)/2 : (exercise.target_weight||0)}
                                    onChange={(v) => updateExercise(index, 'target_weight', useLbs ? Math.round(v/2.20462*2)/2 : v)}
                                    min={0}
-                                   max={useLbs ? 400 : 180}
-                                   step={useLbs ? 2.5 : 0.5}
+                                   max={useLbs ? 1000 : 500}
+                                   step={useLbs ? 0.5 : 0.5}
+                                   buttonStep={useLbs ? 5 : 5}
                                    unit={useLbs ? 'lbs' : 'kg'}
                                  />
                                </div>
@@ -762,7 +763,8 @@ const WorkoutPlanner = () => {
                                       onChange={(v) => updateExercise(index, 'target_duration_sec', v)}
                                       min={1}
                                       max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
-                                      step={exercise.duration_unit === 'hr' ? 0.5 : exercise.duration_unit === 'min' ? 0.5 : 5}
+                                      step={exercise.duration_unit === 'hr' ? 0.25 : exercise.duration_unit === 'min' ? 0.5 : 5}
+                                      buttonStep={exercise.duration_unit === 'hr' ? 1 : exercise.duration_unit === 'min' ? 5 : 30}
                                       unit=""
                                     />
                                     <div className="flex justify-start">
@@ -783,8 +785,9 @@ const WorkoutPlanner = () => {
                                       value={exercise.target_distance_km || 0}
                                       onChange={(v) => updateExercise(index, 'target_distance_km', v)}
                                       min={0}
-                                      max={exercise.distance_unit === 'm' ? 50000 : 50}
-                                      step={exercise.distance_unit === 'm' ? 50 : 0.5}
+                                      max={exercise.distance_unit === 'm' ? 100000 : 200}
+                                      step={exercise.distance_unit === 'm' ? 10 : 0.5}
+                                      buttonStep={exercise.distance_unit === 'm' ? 100 : 5}
                                       unit=""
                                     />
                                     <div className="flex justify-start">
