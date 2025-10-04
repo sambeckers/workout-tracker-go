@@ -1,6 +1,7 @@
 import StatsCard from "@/components/dashboard/StatsCard";
 import QuickActions from "@/components/dashboard/QuickActions";
 import HeroGallery from "@/components/layout/HeroGallery";
+import { SeedDataButton } from "@/components/dashboard/SeedDataButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Dumbbell, Target, TrendingUp, Clock, Trophy, Flame, Activity } from "lucide-react";
@@ -27,6 +28,10 @@ const Index = () => {
   return (
     <div className="space-y-4 md:space-y-8">
       {/* Hero Gallery Section */}
+      <div className="flex items-center justify-between mb-4">
+        <div />
+        <SeedDataButton />
+      </div>
       <HeroGallery 
         userName={userName}
         onStartWorkout={() => navigate('/dashboard/workout/new')}
