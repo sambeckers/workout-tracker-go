@@ -41,9 +41,12 @@ export const useExerciseHistory = (exerciseId: string, limit: number = 25, exerc
   return useQuery({
     queryKey: ['exercise-history', user?.id, exerciseId, limit, exerciseName],
     queryFn: async () => {
-      if (!user?.id || !exerciseId) return [];
+      if (!user?.id) return [];
+      if (!exerciseId && !exerciseName) return [];
+      
       // Primary fetch by exercise_id
-      let { data, error } = await supabase
+      if (exerciseId) {
+        let { data, error } = await supabase
         .from('exercise_logs')
         .select(`
           *,
@@ -58,8 +61,10 @@ export const useExerciseHistory = (exerciseId: string, limit: number = 25, exerc
         .eq('session.status', 'Done')
         .order('session.date', { ascending: false })
         .limit(limit);
-      if (error) throw error;
-      if (data && data.length > 0) return data as (ExerciseLog & { session: { date: string } })[];
+        if (error) throw error;
+        if (data && data.length > 0) return data as (ExerciseLog & { session: { date: string } })[];
+      }
+      
       // Fallback: if no rows and we have a name, attempt name-based join (in case of differing IDs across seeds)
       if (exerciseName) {
         const { data: nameData, error: nameErr } = await supabase
@@ -94,6 +99,8 @@ export const useExerciseHistory = (exerciseId: string, limit: number = 25, exerc
       }
       return [];
     },
-    enabled: !!user?.id && !!exerciseId,
+    enabled: !!user?.id && (!!exerciseId || !!exerciseName),
+    staleTime: 30000, // Cache for 30 seconds
+    refetchOnWindowFocus: false,
   });
 };

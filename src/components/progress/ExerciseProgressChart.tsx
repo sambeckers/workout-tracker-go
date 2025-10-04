@@ -25,7 +25,7 @@ export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
   metricTime,
   metricDistance,
 }) => {
-  const { data: history = [] } = useExerciseHistory(exerciseId, 25, exerciseName);
+  const { data: history = [], isLoading } = useExerciseHistory(exerciseId, 25, exerciseName);
   const { unit } = useUnitPreference();
   const profile = classifyExercise({ exercise_id: exerciseId, name: exerciseName, metric_weight: metricWeight, metric_reps: metricReps, metric_time: metricTime, metric_distance: metricDistance });
   const [mode, setMode] = useState<string>(() => {
@@ -95,7 +95,16 @@ export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
     });
   }, [history, unit, mode]);
 
-  if (!history.length) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg animate-pulse">
+        <Activity className="h-4 w-4" />
+        <span>Loading history...</span>
+      </div>
+    );
+  }
+
+  if (!exerciseId || !history.length) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
         <Activity className="h-4 w-4" />
