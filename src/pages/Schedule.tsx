@@ -12,6 +12,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from '@/lib/date-utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { GenerateRandomWorkout } from '@/components/dashboard/GenerateRandomWorkout';
 
 const Schedule = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -192,6 +193,7 @@ const Schedule = () => {
             <Download className="h-4 w-4" />
             Export Data
           </Button>
+          <GenerateRandomWorkout />
           <Button 
             onClick={handleCreateWorkout}
             className="flex items-center gap-2"
