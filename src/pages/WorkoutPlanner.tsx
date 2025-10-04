@@ -234,7 +234,7 @@ const WorkoutPlanner = () => {
           target_sets: progressive.target_sets ?? 3,
           target_reps: progressive.target_reps ?? '10',
           target_weight: progressive.target_weight,
-          target_duration_sec: progressive.target_duration_sec,
+          target_duration_sec: progressive.target_duration_sec ? Math.round(progressive.target_duration_sec / 60) : undefined,
           target_distance_km: progressive.target_distance_km,
           duration_unit: 'min',
           distance_unit: 'km',
