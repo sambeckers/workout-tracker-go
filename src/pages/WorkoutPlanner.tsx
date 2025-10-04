@@ -212,11 +212,11 @@ const WorkoutPlanner = () => {
           if (user?.id) {
             const { data } = await supabase
               .from('exercise_logs')
-              .select(`*, session:workout_sessions!inner(user_id,status,date)`) // narrow fields
+              .select(`*, session:workout_sessions!inner(user_id,status,date)`)
               .eq('exercise_id', exercise.exercise_id)
               .eq('session.user_id', user.id)
               .eq('session.status', 'Done')
-              .order('session.date', { ascending: false })
+              .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
             if (data) lastLog = data;
