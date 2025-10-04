@@ -607,3 +607,57 @@ export const useUpdateExercise = () => {
 };
 
 // TODO: Add categories hooks after running migration and regenerating Supabase types
+
+// Delete exercise by ID
+export const useDeleteExercise = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (exerciseId: string) => {
+      const { error } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('exercise_id', exerciseId);
+      if (error) throw error;
+      return exerciseId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      toast.success('Exercise deleted');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete exercise');
+      console.error(error);
+    }
+  });
+};
+
+// Delete exercise(s) by name (case-insensitive). Returns number deleted.
+export const useDeleteExerciseByName = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => {
+      // Fetch matching IDs first
+      const { data: matches, error: fetchErr } = await supabase
+        .from('exercises')
+        .select('exercise_id')
+        .ilike('name', name);
+      if (fetchErr) throw fetchErr;
+      if (!matches || matches.length === 0) return 0;
+      const ids = matches.map(m => m.exercise_id);
+      const { error: delErr } = await supabase
+        .from('exercises')
+        .delete()
+        .in('exercise_id', ids);
+      if (delErr) throw delErr;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      toast.success(`Deleted ${count} exercise${count===1?'':'s'}`);
+    },
+    onError: (error) => {
+      toast.error('Failed to delete by name');
+      console.error(error);
+    }
+  });
+};

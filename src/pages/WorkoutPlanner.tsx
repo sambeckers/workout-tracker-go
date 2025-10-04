@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save, Search, Star, Check } from 'lucide-react';
+import { ArrowLeft, Plus, X, Calendar, Clock, Dumbbell, Save, Search, Star, Check, PanelRightOpen, BarChart2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import NumberStepper from '@/components/ui/number-stepper';
 import { UnitToggle } from '@/components/ui/unit-toggle';
@@ -22,6 +22,7 @@ import { ExerciseProgressChart } from '@/components/progress/ExerciseProgressCha
 import { convertKgToUnit, convertUnitToKg } from '@/lib/units';
 import { supabase } from '@/integrations/supabase/client';
 import { classifyExercise, deriveProgressiveDefaults } from '@/lib/metrics';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface SelectedExercise {
   exercise_id: string;
@@ -68,6 +69,70 @@ const WorkoutPlanner = () => {
   const { unit } = useUnitPreference();
   const useLbs = unit === 'lbs';
   const { saveDraft, loadDraft, clearDraft } = useDraftWorkout();
+  const [progressExercise, setProgressExercise] = useState<{id:string; name:string; metrics?:any}|null>(null);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+
+  // Restore last progress exercise
+  useEffect(()=>{
+    try {
+      const lastId = localStorage.getItem('planner.progress.exercise');
+      const lastOpen = localStorage.getItem('planner.progress.open') === '1';
+      if (lastId && lastOpen) {
+        const ex = selectedExercises.find(e => e.exercise_id === lastId);
+        if (ex) {
+          const exerciseData = exercises.find(ed => ed.exercise_id === ex.exercise_id);
+            setProgressExercise({ id: ex.exercise_id, name: ex.name, metrics: exerciseData });
+            setProgressOpen(true);
+        }
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercises.length]);
+
+  // Persist state
+  useEffect(()=>{
+    try {
+      if (progressExercise) {
+        localStorage.setItem('planner.progress.exercise', progressExercise.id);
+        localStorage.setItem('planner.progress.open', progressOpen ? '1':'0');
+      } else {
+        localStorage.removeItem('planner.progress.exercise');
+        localStorage.setItem('planner.progress.open', '0');
+      }
+    } catch {}
+  }, [progressExercise, progressOpen]);
+
+  // Keyboard shortcuts
+  useEffect(()=>{
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+      if (e.key === 'p') {
+        if (progressExercise) {
+          setProgressOpen(o=>!o);
+        } else if (selectedExercises.length>0) {
+          const ex = selectedExercises[0];
+          const exerciseData = exercises.find(ed => ed.exercise_id === ex.exercise_id);
+          setProgressExercise({ id: ex.exercise_id, name: ex.name, metrics: exerciseData });
+          setProgressOpen(true);
+        }
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && progressExercise) {
+        e.preventDefault();
+        const idx = selectedExercises.findIndex(se => se.exercise_id === progressExercise.id);
+        if (idx !== -1) {
+          const nextIdx = e.key === 'ArrowDown' ? (idx + 1) % selectedExercises.length : (idx - 1 + selectedExercises.length) % selectedExercises.length;
+          const ex = selectedExercises[nextIdx];
+          const exerciseData = exercises.find(ed => ed.exercise_id === ex.exercise_id);
+          setProgressExercise({ id: ex.exercise_id, name: ex.name, metrics: exerciseData });
+          setProgressOpen(true);
+        }
+      } else if (e.key === 'Escape' && progressOpen) {
+        setProgressOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [progressExercise, progressOpen, selectedExercises, exercises]);
 
   useEffect(() => {
     try {
@@ -601,37 +666,54 @@ const WorkoutPlanner = () => {
                   </div>
                 ) : (
                   selectedExercises.map((exercise, index) => (
-                    <Card key={exercise.exercise_id} className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">{exercise.name}</h4>
+                    <Card key={exercise.exercise_id} className={`p-4 ${progressExercise?.id===exercise.exercise_id ? 'ring-2 ring-primary' : ''}`}>
+                      <div className="flex items-start justify-between mb-3 gap-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium flex items-center gap-2">
+                            {exercise.name}
+                            <Button
+                              type="button"
+                              variant={progressExercise?.id===exercise.exercise_id? 'default':'outline'}
+                              size="sm"
+                              className="h-6 px-2 text-[10px]"
+                              onClick={() => {
+                                const exerciseData = exercises.find(ex => ex.exercise_id === exercise.exercise_id);
+                                setProgressExercise({ id: exercise.exercise_id, name: exercise.name, metrics: exerciseData });
+                                setProgressOpen(true);
+                              }}
+                              aria-label="Open progress split view"
+                            >
+                              <BarChart2 className="h-3 w-3" />
+                              Prog
+                            </Button>
+                          </h4>
                           {exercise.muscle_group && (
                             <Badge variant="secondary" className="text-xs mt-1">
                               {exercise.muscle_group}
                             </Badge>
                           )}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          type="button"
-                          onClick={() => removeExercise(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            type="button"
+                            onClick={() => removeExercise(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      
+                      {/* existing exercise config UI ... */}
                       {(() => {
-                        // Find the exercise data to get metric settings
                         const exerciseData = exercises.find(ex => ex.exercise_id === exercise.exercise_id);
                         const showReps = exerciseData?.metric_reps !== false; // default true
                         const showWeight = exerciseData?.metric_weight !== false; // default true  
                         const showTime = exerciseData?.metric_time === true;
                         const showDistance = exerciseData?.metric_distance === true;
-                        
-                         return (
-                           <>
-                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        return (
+                          <> {/* unchanged sections below */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                              {/* Always show sets for weight/rep exercises */}
                              {(showReps || showWeight) && (
                                <div className="space-y-2">
@@ -728,22 +810,10 @@ const WorkoutPlanner = () => {
                                <p className="text-xs text-muted-foreground mt-1">Suggestion: {exercise.suggestion}</p>
                              )}
                            </div>
-
-                           {/* Progress Chart */}
-                           <div className="mt-4">
-                             <ExerciseProgressChart
-                               exerciseId={exercise.exercise_id}
-                               exerciseName={exercise.name}
-                               metricWeight={exerciseData?.metric_weight}
-                               metricReps={exerciseData?.metric_reps}
-                               metricTime={exerciseData?.metric_time}
-                               metricDistance={exerciseData?.metric_distance}
-                             />
-                           </div>
-                           </>
-                         );
-                       })()}
-                     </Card>
+                        </>
+                        );
+                      })()}
+                    </Card>
                   ))
                 )}
               </div>
@@ -827,6 +897,66 @@ const WorkoutPlanner = () => {
           </Card>
         </div>
       </div>
+      {progressExercise && (
+        isDesktop ? (
+          <div className="fixed top-0 right-0 h-full w-full lg:w-[38%] xl:w-[34%] 2xl:w-[30%] bg-background border-l shadow-lg overflow-y-auto z-30 p-4 hidden lg:block">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-sm flex items-center gap-2"><BarChart2 className="h-4 w-4" /> {progressExercise.name} Progress</h3>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={selectedExercises.length<=1} onClick={()=>{
+                  if(!progressExercise) return; const idx = selectedExercises.findIndex(se=>se.exercise_id===progressExercise.id); if(idx>-1){ const prev = selectedExercises[(idx-1+selectedExercises.length)%selectedExercises.length]; const data = exercises.find(ed=>ed.exercise_id===prev.exercise_id); setProgressExercise({id:prev.exercise_id,name:prev.name,metrics:data}); }
+                }}>Prev</Button>
+                <Button variant="outline" size="sm" disabled={selectedExercises.length<=1} onClick={()=>{
+                  if(!progressExercise) return; const idx = selectedExercises.findIndex(se=>se.exercise_id===progressExercise.id); if(idx>-1){ const next = selectedExercises[(idx+1)%selectedExercises.length]; const data = exercises.find(ed=>ed.exercise_id===next.exercise_id); setProgressExercise({id:next.exercise_id,name:next.name,metrics:data}); }
+                }}>Next</Button>
+                <Button variant="ghost" size="sm" onClick={()=>{ setProgressOpen(false); setProgressExercise(null); }}>Close</Button>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground mb-3 flex flex-wrap gap-2">
+              <span>[p] toggle</span>
+              <span>[↑/↓] cycle</span>
+              <span>[Esc] close</span>
+            </div>
+            <ExerciseProgressChart
+              exerciseId={progressExercise.id}
+              exerciseName={progressExercise.name}
+              metricWeight={progressExercise.metrics?.metric_weight}
+              metricReps={progressExercise.metrics?.metric_reps}
+              metricTime={progressExercise.metrics?.metric_time}
+              metricDistance={progressExercise.metrics?.metric_distance}
+            />
+          </div>
+        ) : (
+          <Sheet open={progressOpen} onOpenChange={(o)=>{ if(!o){ setProgressExercise(null);} setProgressOpen(o); }}>
+            <SheetContent side="right" className="w-full sm:max-w-md">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2 text-sm"><BarChart2 className="h-4 w-4" /> {progressExercise.name} Progress</SheetTitle>
+              </SheetHeader>
+              <div className="flex items-center gap-2 mt-2">
+                <Button variant="outline" size="sm" disabled={selectedExercises.length<=1} onClick={()=>{
+                  if(!progressExercise) return; const idx = selectedExercises.findIndex(se=>se.exercise_id===progressExercise.id); if(idx>-1){ const prev = selectedExercises[(idx-1+selectedExercises.length)%selectedExercises.length]; const data = exercises.find(ed=>ed.exercise_id===prev.exercise_id); setProgressExercise({id:prev.exercise_id,name:prev.name,metrics:data}); }
+                }}>Prev</Button>
+                <Button variant="outline" size="sm" disabled={selectedExercises.length<=1} onClick={()=>{
+                  if(!progressExercise) return; const idx = selectedExercises.findIndex(se=>se.exercise_id===progressExercise.id); if(idx>-1){ const next = selectedExercises[(idx+1)%selectedExercises.length]; const data = exercises.find(ed=>ed.exercise_id===next.exercise_id); setProgressExercise({id:next.exercise_id,name:next.name,metrics:data}); }
+                }}>Next</Button>
+                <div className="ml-auto text-[10px] text-muted-foreground flex gap-2">
+                  <span>[p]</span><span>[↑/↓]</span><span>[Esc]</span>
+                </div>
+              </div>
+              <div className="mt-4">
+                <ExerciseProgressChart
+                  exerciseId={progressExercise.id}
+                  exerciseName={progressExercise.name}
+                  metricWeight={progressExercise.metrics?.metric_weight}
+                  metricReps={progressExercise.metrics?.metric_reps}
+                  metricTime={progressExercise.metrics?.metric_time}
+                  metricDistance={progressExercise.metrics?.metric_distance}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )
+      )}
     </div>
   );
 };

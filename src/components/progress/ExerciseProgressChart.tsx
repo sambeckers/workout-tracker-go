@@ -25,7 +25,7 @@ export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
   metricTime,
   metricDistance,
 }) => {
-  const { data: history = [] } = useExerciseHistory(exerciseId, 10);
+  const { data: history = [] } = useExerciseHistory(exerciseId, 25, exerciseName);
   const { unit } = useUnitPreference();
   const profile = classifyExercise({ exercise_id: exerciseId, name: exerciseName, metric_weight: metricWeight, metric_reps: metricReps, metric_time: metricTime, metric_distance: metricDistance });
   const [mode, setMode] = useState<string>(() => {
