@@ -159,7 +159,7 @@ export const ExerciseProgressChart: React.FC<ExerciseProgressChartProps> = ({
           </div>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={80}>
+      <ResponsiveContainer width="100%" height={160}>
         <LineChart data={chartData}>
           <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
           <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" width={40} />

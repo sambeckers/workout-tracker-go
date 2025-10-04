@@ -81,7 +81,7 @@ export function deriveProgressiveDefaults(profile: ExerciseMetricProfile, last: 
         const avg = repsArr.length ? Math.round(repsArr.reduce((a,b)=>a+b,0)/repsArr.length) : 10;
         out.target_reps = String(avg);
       } else {
-        out.target_reps = '10';
+        out.target_reps = '12';
       }
     }
 
