@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
         date: sessionDate.toISOString().split('T')[0],
         time: `${6 + Math.floor(Math.random() * 12)}:${Math.random() > 0.5 ? '00' : '30'}:00`,
         title: sessionTitle,
-        status: 'Completed',
+        status: 'Done',
         duration_minutes: 45 + Math.floor(Math.random() * 45),
         notes: null
       };
