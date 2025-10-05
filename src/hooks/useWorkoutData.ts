@@ -566,6 +566,7 @@ export const useWorkoutTemplates = () => {
       const { data, error } = await (supabase as any)
         .from('workout_templates')
         .select('*, workout_template_exercises:workout_template_exercises(*, exercise:exercises(*))')
+        .is('deleted_at', null)
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
       if(error) throw error;
