@@ -314,6 +314,7 @@ export type Database = {
       workout_templates: {
         Row: {
           created_at: string
+          deleted_at: string | null
           last_used: string | null
           notes: string | null
           template_id: string
@@ -324,6 +325,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           last_used?: string | null
           notes?: string | null
           template_id?: string
@@ -334,6 +336,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           last_used?: string | null
           notes?: string | null
           template_id?: string

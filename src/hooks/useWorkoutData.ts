@@ -87,6 +87,7 @@ export interface WorkoutTemplate {
   last_used?: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   exercises?: WorkoutTemplateExercise[]; // joined convenience
 }
 
@@ -369,31 +370,68 @@ export const useEmptyBin = () => {
         .not('deleted_at', 'is', null);
       
       if (fetchError) throw fetchError;
-      if (!deletedSessions || deletedSessions.length === 0) return;
       
-      const sessionIds = deletedSessions.map(s => s.session_id);
+      // Get all deleted templates
+      const { data: deletedTemplates, error: fetchTemplatesError } = await (supabase as any)
+        .from('workout_templates')
+        .select('template_id')
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null);
       
-      // Delete all associated exercise logs
-      const { error: logsError } = await supabase
-        .from('exercise_logs')
-        .delete()
-        .in('session_id', sessionIds);
+      if (fetchTemplatesError) throw fetchTemplatesError;
       
-      if (logsError) throw logsError;
+      let count = 0;
       
-      // Delete all sessions
-      const { error } = await supabase
-        .from('workout_sessions')
-        .delete()
-        .in('session_id', sessionIds);
+      // Delete all sessions and their logs
+      if (deletedSessions && deletedSessions.length > 0) {
+        const sessionIds = deletedSessions.map(s => s.session_id);
+        
+        // Delete all associated exercise logs
+        const { error: logsError } = await supabase
+          .from('exercise_logs')
+          .delete()
+          .in('session_id', sessionIds);
+        
+        if (logsError) throw logsError;
+        
+        // Delete all sessions
+        const { error } = await supabase
+          .from('workout_sessions')
+          .delete()
+          .in('session_id', sessionIds);
+        
+        if (error) throw error;
+        count += sessionIds.length;
+      }
       
-      if (error) throw error;
+      // Delete all templates and their exercises
+      if (deletedTemplates && deletedTemplates.length > 0) {
+        const templateIds = deletedTemplates.map((t: any) => t.template_id);
+        
+        // Delete all associated template exercises
+        const { error: templateExercisesError } = await (supabase as any)
+          .from('workout_template_exercises')
+          .delete()
+          .in('template_id', templateIds);
+        
+        if (templateExercisesError) throw templateExercisesError;
+        
+        // Delete all templates
+        const { error: templatesError } = await (supabase as any)
+          .from('workout_templates')
+          .delete()
+          .in('template_id', templateIds);
+        
+        if (templatesError) throw templatesError;
+        count += templateIds.length;
+      }
       
-      return deletedSessions.length;
+      return count;
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['deleted-workout-sessions'] });
-      toast.success(`Permanently deleted ${count} workout session${count !== 1 ? 's' : ''}`);
+      queryClient.invalidateQueries({ queryKey: ['deleted-workout-templates'] });
+      toast.success(`Permanently deleted ${count} item${count !== 1 ? 's' : ''}`);
     },
     onError: (error) => {
       toast.error('Failed to empty bin');
@@ -608,12 +646,92 @@ export const useDeleteWorkoutTemplate = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (template_id: string) => {
-      const { error } = await (supabase as any).from('workout_templates').delete().eq('template_id', template_id);
+      const { error } = await (supabase as any)
+        .from('workout_templates')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('template_id', template_id);
       if(error) throw error;
       return template_id;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workout-templates'] }); toast.success('Template deleted'); },
+    onSuccess: () => { 
+      qc.invalidateQueries({ queryKey: ['workout-templates'] }); 
+      qc.invalidateQueries({ queryKey: ['deleted-workout-templates'] });
+      toast.success('Template moved to bin'); 
+    },
     onError: (e) => { toast.error('Failed to delete template'); console.error(e); }
+  });
+};
+
+export const useDeletedWorkoutTemplates = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['deleted-workout-templates', user?.id],
+    queryFn: async () => {
+      if(!user?.id) throw new Error('User not authenticated');
+      const { data, error } = await (supabase as any)
+        .from('workout_templates')
+        .select('*, workout_template_exercises:workout_template_exercises(*, exercise:exercises(*))')
+        .eq('user_id', user.id)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+      if(error) throw error;
+      const templates: WorkoutTemplate[] = (data||[]).map((t: any)=>{
+        const exercises = (t.workout_template_exercises||[]).map((wte: any)=>({ 
+          ...wte, 
+          exercise: wte.exercise 
+        }));
+        return { ...t, exercises };
+      });
+      return templates;
+    },
+    enabled: !!user?.id
+  });
+};
+
+export const useRestoreWorkoutTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (template_id: string) => {
+      const { error } = await (supabase as any)
+        .from('workout_templates')
+        .update({ deleted_at: null })
+        .eq('template_id', template_id);
+      if(error) throw error;
+      return template_id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-templates'] });
+      qc.invalidateQueries({ queryKey: ['deleted-workout-templates'] });
+      toast.success('Template restored successfully');
+    },
+    onError: (e) => { toast.error('Failed to restore template'); console.error(e); }
+  });
+};
+
+export const usePermanentlyDeleteWorkoutTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (template_id: string) => {
+      // First delete associated exercises
+      const { error: exErr } = await (supabase as any)
+        .from('workout_template_exercises')
+        .delete()
+        .eq('template_id', template_id);
+      if(exErr) throw exErr;
+      
+      // Then delete the template
+      const { error } = await (supabase as any)
+        .from('workout_templates')
+        .delete()
+        .eq('template_id', template_id);
+      if(error) throw error;
+      return template_id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['deleted-workout-templates'] });
+      toast.success('Template permanently deleted');
+    },
+    onError: (e) => { toast.error('Failed to permanently delete template'); console.error(e); }
   });
 };
 
