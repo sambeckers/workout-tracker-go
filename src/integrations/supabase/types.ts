@@ -278,6 +278,72 @@ export type Database = {
         }
         Relationships: []
       }
+      workout_template_exercises: {
+        Row: {
+          exercise_id: string
+          exercise_order: number
+          template_id: string
+        }
+        Insert: {
+          exercise_id: string
+          exercise_order?: number
+          template_id: string
+        }
+        Update: {
+          exercise_id?: string
+          exercise_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_template_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["exercise_id"]
+          },
+          {
+            foreignKeyName: "workout_template_exercises_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workout_templates"
+            referencedColumns: ["template_id"]
+          },
+        ]
+      }
+      workout_templates: {
+        Row: {
+          created_at: string
+          last_used: string | null
+          notes: string | null
+          template_id: string
+          template_name: string
+          updated_at: string
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_used?: string | null
+          notes?: string | null
+          template_id?: string
+          template_name: string
+          updated_at?: string
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_used?: string | null
+          notes?: string | null
+          template_id?: string
+          template_name?: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
