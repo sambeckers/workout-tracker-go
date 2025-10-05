@@ -14,7 +14,8 @@ import NumberStepper from '@/components/ui/number-stepper';
 import { UnitToggle } from '@/components/ui/unit-toggle';
 import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
-import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession } from '@/hooks/useWorkoutData';
+import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession, useWorkoutTemplates, useCreateWorkoutTemplate, useRegisterTemplateUse, scoreTemplates } from '@/hooks/useWorkoutData';
+import { generateTemplateName } from '@/utils/templateNaming';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -57,9 +58,12 @@ const WorkoutSession = () => {
   const { data: sessions = [] } = useWorkoutSessions();
   const { data: availableExercises = [] } = useExercises();
   const { data: exerciseLogs = [] } = useExerciseLogs(id && id !== 'new' && id !== 'quick' ? id : undefined);
+  const { data: templates = [] } = useWorkoutTemplates();
   const createExerciseLog = useCreateExerciseLog();
   const createSession = useCreateWorkoutSession();
   const updateSession = useUpdateWorkoutSession();
+  const createTemplate = useCreateWorkoutTemplate();
+  const registerTemplateUse = useRegisterTemplateUse();
   const queryClient = useQueryClient();
   const currentWorkout = useMemo(()=>sessions.find(s=>s.session_id===id), [sessions,id]);
 
@@ -87,6 +91,13 @@ const WorkoutSession = () => {
   const [favoriteExercises,setFavoriteExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('favorite-exercises')||'[]'); } catch { return []; } });
   const [recentExercises,setRecentExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('recent-exercises')||'[]'); } catch { return []; } });
   const autoMarkedDoneRef = useRef(false);
+  // Template modals state
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateNotes, setTemplateNotes] = useState('');
+  const [templateExerciseSelection, setTemplateExerciseSelection] = useState<string[]>([]); // exercise ids included when saving
+  const [applyMode, setApplyMode] = useState<'replace' | 'append'>('replace');
   
   // Auto-save state tracking
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -534,6 +545,75 @@ const WorkoutSession = () => {
     }));
   };
 
+  // Initialize Save Template dialog when opened
+  useEffect(()=>{
+    if(saveTemplateOpen){
+      // Pre-fill name suggestion
+      const existingNames = templates.map(t=>t.template_name);
+      const baseName = currentWorkout?.title || 'Workout';
+      const suggested = generateTemplateName({ existingNames, baseSessionName: baseName });
+      setTemplateName(suggested);
+      setTemplateNotes('');
+      setTemplateExerciseSelection(exercises.map(e=>e.id));
+    }
+  }, [saveTemplateOpen, templates, currentWorkout?.title, exercises]);
+
+  const toggleSelectTemplateExercise = (id:string) => {
+    setTemplateExerciseSelection(prev => prev.includes(id) ? prev.filter(i=>i!==id) : [...prev, id]);
+  };
+
+  const handleCreateTemplate = async () => {
+    if(!templateName.trim()) { toast.error('Template name required'); return; }
+    if(!templateExerciseSelection.length){ toast.error('Select at least one exercise'); return; }
+    try {
+      const ordered = exercises.filter(e=>templateExerciseSelection.includes(e.id));
+      await createTemplate.mutateAsync({
+        template_name: templateName.trim(),
+        notes: templateNotes.trim() || null,
+        exercises: ordered.map((e, idx)=>({ exercise_id: e.id, exercise_order: idx }))
+      });
+      setSaveTemplateOpen(false);
+      toast.success('Template saved');
+    } catch (e:any){ /* error toasts handled in hook */ }
+  };
+
+  // Apply template logic
+  const applyTemplate = async (templateId: string) => {
+    const tpl = templates.find(t=>t.template_id===templateId);
+    if(!tpl){ toast.error('Template not found'); return; }
+    // Build exercise objects from template
+    const newExercises: ExerciseWithSets[] = (tpl.exercises||[])
+      .sort((a,b)=>a.exercise_order-b.exercise_order)
+      .map(te => {
+        const base = availableExercises.find(e=>e.exercise_id===te.exercise_id);
+        if(!base) return null;
+        const metric_time = !!base.metric_time;
+        const metric_reps = base.metric_reps !== false;
+        const metric_weight = base.metric_weight !== false;
+        return {
+          id: base.exercise_id,
+          name: base.name,
+          sets: metric_time ? [] : DEFAULT_SETS.map(s=>({...s})),
+          mode: metric_time ? 'time':'sets',
+          advanced: false,
+          enableReps: metric_reps,
+            enableWeight: metric_weight,
+          durationSeconds: metric_time?60:undefined,
+          timeCompleted:false,
+          metric_time, metric_reps, metric_weight, metric_distance: base.metric_distance||false,
+        } as ExerciseWithSets;
+      })
+      .filter(Boolean) as ExerciseWithSets[];
+
+    setExercises(prev => applyMode==='replace' ? newExercises : [...prev, ...newExercises]);
+    setHasUnsavedChanges(true);
+    setApplyTemplateOpen(false);
+    try { await registerTemplateUse.mutateAsync(templateId); } catch {/* silent */}
+    toast.success('Template applied');
+  };
+
+  const recommendedTemplates = scoreTemplates(templates).slice(0,5);
+
   return (
     <div className="app-container p-8 space-y-8">
       {/* Header */}
@@ -580,6 +660,95 @@ const WorkoutSession = () => {
             <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={updateSession.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
               <CheckSquare className="h-4 w-4" />{currentWorkout.status==='Done'?'Done':'Mark Done'}
             </Button>
+          )}
+          {/* Save as Template visible only when session Done and exercises exist */}
+          {currentWorkout && currentWorkout.status==='Done' && exercises.length>0 && (
+            <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" title="Save this completed workout as a reusable template">
+                  <Save className="h-4 w-4" />Save as Template
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[600px] overflow-y-auto">
+                <UIDialogHeader><UIDialogTitle>Create Template</UIDialogTitle></UIDialogHeader>
+                <div className="space-y-4 text-sm">
+                  <div className="grid gap-1">
+                    <label className="text-xs font-medium">Template Name</label>
+                    <Input value={templateName} onChange={e=>setTemplateName(e.target.value)} placeholder="Template name" />
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-xs font-medium">Notes (optional)</label>
+                    <textarea value={templateNotes} onChange={e=>setTemplateNotes(e.target.value)} className="w-full text-xs rounded-md border bg-background p-2 h-24 resize-none focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Warm-up, focus, cues..." />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between"><span className="text-xs font-medium">Exercises ({templateExerciseSelection.length}/{exercises.length})</span><span className="text-[10px] text-muted-foreground">Click to toggle include</span></div>
+                    <div className="flex flex-col gap-1">
+                      {exercises.map((ex, idx)=>(
+                        <button key={ex.id} type="button" onClick={()=>toggleSelectTemplateExercise(ex.id)} className={`flex items-center justify-between px-3 py-2 rounded border text-left text-xs ${templateExerciseSelection.includes(ex.id)?'bg-primary text-primary-foreground border-primary':'hover:bg-muted'}`}> 
+                          <span className="truncate">{idx+1}. {ex.name}</span>
+                          {templateExerciseSelection.includes(ex.id)?<Check className="h-3 w-3" />:null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="ghost" size="sm" onClick={()=>setSaveTemplateOpen(false)}>Cancel</Button>
+                    <Button size="sm" onClick={handleCreateTemplate} disabled={createTemplate.isPending}>{createTemplate.isPending?'Saving...':'Save Template'}</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          {/* Apply Template (visible when editable/planned or new) */}
+          {currentWorkout && currentWorkout.status!=='Done' && (
+            <Dialog open={applyTemplateOpen} onOpenChange={setApplyTemplateOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" title="Add exercises from a template">
+                  <Plus className="h-4 w-4" />Add From Template
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[650px] overflow-y-auto">
+                <UIDialogHeader><UIDialogTitle>Apply Template</UIDialogTitle></UIDialogHeader>
+                <div className="space-y-4 text-sm">
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-medium">Mode</label>
+                    <Select value={applyMode} onValueChange={(v:any)=>setApplyMode(v)}>
+                      <SelectTrigger className="w-[160px]" aria-label="Apply mode"><SelectValue placeholder="Mode" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="replace">Replace Current</SelectItem>
+                        <SelectItem value="append">Append</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {recommendedTemplates.length>0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">Recommended</div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {recommendedTemplates.map(r=> (
+                          <Card key={r.template.template_id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={()=>applyTemplate(r.template.template_id)}>
+                            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center justify-between"><span className="truncate" title={r.template.template_name}>{r.template.template_name}</span><Badge variant="outline" className="text-[10px]">{r.reason}</Badge></CardTitle></CardHeader>
+                            <CardContent className="text-[11px] text-muted-foreground flex justify-between"><span>{(r.template.exercises||[]).length} exercises</span><span>Uses {r.template.use_count}</span></CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">All Templates</div>
+                    {templates.length? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {templates.map(t => (
+                          <Card key={t.template_id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={()=>applyTemplate(t.template_id)}>
+                            <CardHeader className="pb-2"><CardTitle className="text-sm truncate" title={t.template_name}>{t.template_name}</CardTitle></CardHeader>
+                            <CardContent className="text-[11px] text-muted-foreground flex justify-between"><span>{(t.exercises||[]).length} exercises</span>{t.last_used && <span>Used {new Date(t.last_used).toLocaleDateString()}</span>}</CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : <div className="text-xs text-muted-foreground py-6">No templates yet. Create one from a completed session.</div>}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
           <Button variant={isActive?'secondary':'default'} onClick={()=>setIsActive(!isActive)} className="gap-2">{isActive?(<><Pause className="h-4 w-4" />Pause</>):(<><Play className="h-4 w-4" />Start</>)}</Button>
         </div>

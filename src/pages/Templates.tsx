@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit2, Trash2, Copy, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -77,9 +78,15 @@ const TemplatesPage = () => {
     } catch(e){ /* toast */ }
   };
 
+  const [pendingDelete, setPendingDelete] = useState<string|null>(null);
+  const [openDeleteId, setOpenDeleteId] = useState<string|null>(null);
   const remove = async (id: string) => {
-    if(!confirm('Delete template?')) return;
-    try { await deleteTemplate.mutateAsync(id); } catch(e){ /* toast */ }
+    try {
+      setPendingDelete(id);
+      await deleteTemplate.mutateAsync(id);
+      setOpenDeleteId(null);
+    } catch(e){ /* toast handled in hook */ }
+    finally { setPendingDelete(null); }
   };
 
   return (
@@ -122,12 +129,32 @@ const TemplatesPage = () => {
         {filtered.map(t => (
           <Card key={t.template_id}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center justify-between">
-                <span className="truncate" title={t.template_name}>{t.template_name}</span>
-                <div className="flex gap-1">
+              <CardTitle className="text-sm flex flex-col gap-2">
+                <span className="whitespace-normal break-words leading-snug" title={t.template_name}>{t.template_name}</span>
+                <div className="flex gap-1 self-start">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()=>startEdit(t.template_id)} title="Edit"><Edit2 className="h-3 w-3" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()=>duplicate(t.template_id)} title="Duplicate"><Copy className="h-3 w-3" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={()=>remove(t.template_id)} title="Delete"><Trash2 className="h-3 w-3" /></Button>
+                  <AlertDialog open={openDeleteId===t.template_id} onOpenChange={(o)=> setOpenDeleteId(o? t.template_id : null)}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete" disabled={pendingDelete===t.template_id}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Template</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove "{t.template_name}" and its exercise list. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={pendingDelete===t.template_id}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={()=>remove(t.template_id)} disabled={pendingDelete===t.template_id} className="bg-destructive hover:bg-destructive/90">
+                          {pendingDelete===t.template_id? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardTitle>
             </CardHeader>
