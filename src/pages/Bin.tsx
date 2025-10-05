@@ -1,21 +1,26 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDeletedWorkoutSessions, useRestoreWorkoutSession, usePermanentlyDeleteWorkoutSession, useEmptyBin } from '@/hooks/useWorkoutData';
+import { useDeletedWorkoutSessions, useRestoreWorkoutSession, usePermanentlyDeleteWorkoutSession, useEmptyBin, useDeletedWorkoutTemplates, useRestoreWorkoutTemplate, usePermanentlyDeleteWorkoutTemplate } from '@/hooks/useWorkoutData';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Trash2, RotateCcw, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Trash2, RotateCcw, Calendar, Clock, AlertTriangle, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 export default function Bin() {
   const { user } = useAuth();
   const { data: deletedSessions, isLoading } = useDeletedWorkoutSessions();
-  const restoreMutation = useRestoreWorkoutSession();
-  const permanentDeleteMutation = usePermanentlyDeleteWorkoutSession();
+  const { data: deletedTemplates, isLoading: templatesLoading } = useDeletedWorkoutTemplates();
+  const restoreSessionMutation = useRestoreWorkoutSession();
+  const permanentDeleteSessionMutation = usePermanentlyDeleteWorkoutSession();
+  const restoreTemplateMutation = useRestoreWorkoutTemplate();
+  const permanentDeleteTemplateMutation = usePermanentlyDeleteWorkoutTemplate();
   const emptyBinMutation = useEmptyBin();
   
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
   const [showEmptyBinDialog, setShowEmptyBinDialog] = useState(false);
 
   if (!user) {
@@ -31,26 +36,41 @@ export default function Bin() {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || templatesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading deleted workouts...</div>
+        <div className="text-muted-foreground">Loading deleted items...</div>
       </div>
     );
   }
 
-  const handleRestore = (sessionId: string) => {
-    restoreMutation.mutate(sessionId);
+  const handleRestoreSession = (sessionId: string) => {
+    restoreSessionMutation.mutate(sessionId);
   };
 
-  const handlePermanentDelete = (sessionId: string) => {
+  const handlePermanentDeleteSession = (sessionId: string) => {
     setSessionToDelete(sessionId);
   };
 
-  const confirmPermanentDelete = () => {
+  const confirmPermanentDeleteSession = () => {
     if (sessionToDelete) {
-      permanentDeleteMutation.mutate(sessionToDelete);
+      permanentDeleteSessionMutation.mutate(sessionToDelete);
       setSessionToDelete(null);
+    }
+  };
+
+  const handleRestoreTemplate = (templateId: string) => {
+    restoreTemplateMutation.mutate(templateId);
+  };
+
+  const handlePermanentDeleteTemplate = (templateId: string) => {
+    setTemplateToDelete(templateId);
+  };
+
+  const confirmPermanentDeleteTemplate = () => {
+    if (templateToDelete) {
+      permanentDeleteTemplateMutation.mutate(templateToDelete);
+      setTemplateToDelete(null);
     }
   };
 
@@ -72,36 +92,43 @@ export default function Bin() {
     }
   };
 
+  const totalItems = (deletedSessions?.length || 0) + (deletedTemplates?.length || 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workout Bin</h1>
-          <p className="text-muted-foreground mt-1">Deleted workouts can be restored or permanently removed</p>
+          <h1 className="text-3xl font-bold tracking-tight">Bin</h1>
+          <p className="text-muted-foreground mt-1">Deleted items can be restored or permanently removed</p>
         </div>
-        {deletedSessions && deletedSessions.length > 0 && (
+        {totalItems > 0 && (
           <Button 
             variant="destructive" 
             onClick={handleEmptyBin}
             disabled={emptyBinMutation.isPending}
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Empty Bin ({deletedSessions.length})
+            Empty Bin ({totalItems})
           </Button>
         )}
       </div>
 
-      {!deletedSessions || deletedSessions.length === 0 ? (
+      {totalItems === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Trash2 className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium">Bin is empty</p>
-            <p className="text-sm text-muted-foreground mt-1">Deleted workouts will appear here</p>
+            <p className="text-sm text-muted-foreground mt-1">Deleted items will appear here</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {deletedSessions.map((session) => (
+        <div className="space-y-8">
+          {/* Deleted Workouts Section */}
+          {deletedSessions && deletedSessions.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Workouts</h2>
+              <div className="grid gap-4">
+                {deletedSessions.map((session) => (
             <Card key={session.session_id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -144,8 +171,8 @@ export default function Bin() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRestore(session.session_id)}
-                      disabled={restoreMutation.isPending}
+                      onClick={() => handleRestoreSession(session.session_id)}
+                      disabled={restoreSessionMutation.isPending}
                       className="flex-1 sm:flex-none"
                     >
                       <RotateCcw className="h-4 w-4 mr-2" />
@@ -154,8 +181,8 @@ export default function Bin() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handlePermanentDelete(session.session_id)}
-                      disabled={permanentDeleteMutation.isPending}
+                      onClick={() => handlePermanentDeleteSession(session.session_id)}
+                      disabled={permanentDeleteSessionMutation.isPending}
                       className="flex-1 sm:flex-none"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -165,11 +192,82 @@ export default function Bin() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Deleted Templates Section */}
+          {deletedTemplates && deletedTemplates.length > 0 && (
+            <div className="space-y-4">
+              {deletedSessions && deletedSessions.length > 0 && <Separator />}
+              <h2 className="text-xl font-semibold">Templates</h2>
+              <div className="grid gap-4">
+                {deletedTemplates.map((template) => (
+                  <Card key={template.template_id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col sm:flex-row justify-between gap-4">
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-start gap-3">
+                            <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">
+                                {template.template_name}
+                              </h3>
+                              <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                                <div>{(template.exercises||[]).length} exercises</div>
+                                <div>Uses: {template.use_count}</div>
+                                {template.last_used && (
+                                  <div>Last used: {format(parseISO(template.last_used), 'MMM dd, yyyy')}</div>
+                                )}
+                              </div>
+                              {template.notes && (
+                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                  {template.notes}
+                                </p>
+                              )}
+                              {template.deleted_at && (
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Deleted {format(parseISO(template.deleted_at), 'MMM dd, yyyy HH:mm')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex sm:flex-col gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRestoreTemplate(template.template_id)}
+                            disabled={restoreTemplateMutation.isPending}
+                            className="flex-1 sm:flex-none"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Restore
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handlePermanentDeleteTemplate(template.template_id)}
+                            disabled={permanentDeleteTemplateMutation.isPending}
+                            className="flex-1 sm:flex-none"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Forever
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Permanent Delete Confirmation Dialog */}
+      {/* Permanent Delete Session Confirmation Dialog */}
       <AlertDialog open={!!sessionToDelete} onOpenChange={() => setSessionToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -183,7 +281,28 @@ export default function Bin() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPermanentDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={confirmPermanentDeleteSession} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent Delete Template Confirmation Dialog */}
+      <AlertDialog open={!!templateToDelete} onOpenChange={() => setTemplateToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Permanently Delete Template?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this template and all associated exercise configurations.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPermanentDeleteTemplate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Delete Forever
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -199,7 +318,7 @@ export default function Bin() {
               Empty Entire Bin?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all {deletedSessions?.length || 0} workout session(s) in the bin and all associated exercise logs.
+              This action cannot be undone. This will permanently delete all {deletedSessions?.length || 0} workout(s) and {deletedTemplates?.length || 0} template(s) in the bin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
