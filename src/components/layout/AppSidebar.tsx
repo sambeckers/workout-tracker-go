@@ -47,16 +47,14 @@ const AppSidebar = () => {
     { icon: Calendar, label: "Schedule", path: "/dashboard/schedule" },
     { icon: Book, label: "Exercises", path: "/dashboard/exercises" },
     { icon: Book, label: "Templates", path: "/dashboard/templates" },
-    { icon: Target, label: "Goals", path: "/dashboard/goals" },
     { icon: TrendingUp, label: "Progress", path: "/dashboard/progress" },
     { icon: Trash2, label: "Bin", path: "/dashboard/bin" },
     { icon: HelpCircle, label: "Help", path: "/dashboard/help" },
   ];
 
   const quickActions = [
-    { icon: Plus, label: "New Workout", path: "/dashboard/workout/new" },
+    { icon: Plus, label: "Plan Workout", path: "/dashboard/workout/plan" },
     { icon: Dumbbell, label: "Quick Session", path: "/dashboard/workout/quick" },
-    { icon: Target, label: "Add Goal", path: "/dashboard/goals/new" },
   ];
 
   const isActivePath = (path: string) => {

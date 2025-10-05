@@ -20,13 +20,6 @@ const QuickActions = () => {
       variant: "default" as const,
     },
     {
-      icon: Target,
-      label: "Set Goal",
-      description: "Define new target",
-      href: "/dashboard/goals/new",
-      variant: "secondary" as const,
-    },
-    {
       icon: TrendingUp,
       label: "View Progress",
       description: "Check your stats",
@@ -41,7 +34,7 @@ const QuickActions = () => {
         <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           {actions.map((action) => (
             <Link key={action.label} to={action.href}>
               <Button

@@ -10,7 +10,6 @@ import {
   Trash2, 
   Check, 
   Calendar,
-  Target,
   TrendingUp,
   Book,
   Info
@@ -189,14 +188,6 @@ const Help = () => {
                 <div>
                   <p className="font-medium">Exercises</p>
                   <p className="text-sm text-muted-foreground">Browse exercise library and create new exercises</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Target className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Goals</p>
-                  <p className="text-sm text-muted-foreground">Set and track fitness goals with deadlines</p>
                 </div>
               </div>
               

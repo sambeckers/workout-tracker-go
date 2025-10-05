@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Flame, User, Settings, Calendar, Target, TrendingUp, Book } from "lucide-react";
+import { Flame, User, Settings, Calendar, TrendingUp, Book } from "lucide-react";
 
 const Header = () => {
   const location = useLocation();
@@ -8,7 +8,6 @@ const Header = () => {
   const navItems = [
     { icon: Calendar, label: "Schedule", path: "/schedule" },
     { icon: Book, label: "Exercises", path: "/exercises" },
-    { icon: Target, label: "Goals", path: "/goals" },
     { icon: TrendingUp, label: "Progress", path: "/progress" },
   ];
 

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Edit2, Trash2, Copy, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateTemplateName } from '@/utils/templateNaming';
@@ -24,15 +25,40 @@ const TemplatesPage = () => {
   const [newName, setNewName] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newExerciseIds, setNewExerciseIds] = useState<string[]>([]);
+  const [exerciseFilter, setExerciseFilter] = useState('');
+  const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>('all');
 
   const filtered = templates.filter(t => t.template_name.toLowerCase().includes(search.toLowerCase()));
   const scored = useMemo(()=>scoreTemplates(templates).slice(0,5), [templates]);
+  
+  const uniqueMuscleGroups = useMemo(() => {
+    const set = new Set<string>();
+    exercises.forEach(ex => {
+      if (ex.muscle_group) {
+        ex.muscle_group.split(',').map(g => g.trim()).filter(Boolean).forEach(g => set.add(g));
+      }
+    });
+    return Array.from(set).sort();
+  }, [exercises]);
+
+  const filteredExercises = useMemo(() => {
+    const q = exerciseFilter.trim().toLowerCase();
+    return exercises.filter(ex => {
+      const matchesSearch = !q || ex.name.toLowerCase().includes(q) || (ex.muscle_group||'').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (muscleGroupFilter === 'all') return true;
+      const groups = (ex.muscle_group || '').toLowerCase().split(',').map(g => g.trim());
+      return groups.includes(muscleGroupFilter.toLowerCase());
+    });
+  }, [exercises, exerciseFilter, muscleGroupFilter]);
 
   const startCreate = () => {
     const smart = generateTemplateName({ existingNames: templates.map(t=>t.template_name), baseSessionName: 'Workout' });
     setNewName(smart);
     setNewNotes('');
     setNewExerciseIds([]);
+    setExerciseFilter('');
+    setMuscleGroupFilter('all');
     setCreateOpen(true);
   };
 
@@ -55,6 +81,8 @@ const TemplatesPage = () => {
     setNewName(t.template_name);
     setNewNotes(t.notes||'');
     setNewExerciseIds((t.exercises||[]).sort((a,b)=>a.exercise_order-b.exercise_order).map(e=>e.exercise_id));
+    setExerciseFilter('');
+    setMuscleGroupFilter('all');
     setCreateOpen(true);
   };
 
@@ -144,7 +172,7 @@ const TemplatesPage = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Template</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently remove "{t.template_name}" and its exercise list. This action cannot be undone.
+                          This will move "{t.template_name}" to the bin. Are you sure?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -189,10 +217,30 @@ const TemplatesPage = () => {
             </div>
             <div className="space-y-2">
               <div className="text-xs font-medium">Exercises</div>
+              <div className="flex flex-col md:flex-row gap-2 mb-2">
+                <div className="relative flex-1">
+                  <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={exerciseFilter} onChange={e=>setExerciseFilter(e.target.value)} placeholder="Search exercises..." className="pl-6 h-8 text-xs" />
+                </div>
+                <Select value={muscleGroupFilter} onValueChange={setMuscleGroupFilter}>
+                  <SelectTrigger className="w-full md:w-[160px] h-8 text-xs">
+                    <SelectValue placeholder="Muscle Group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Groups</SelectItem>
+                    {uniqueMuscleGroups.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex flex-wrap gap-2 max-h-40 overflow-auto p-2 border rounded-md">
-                {exercises.map(ex=>(
+                {filteredExercises.map(ex=>(
                   <button key={ex.exercise_id} onClick={()=>toggleExercise(ex.exercise_id)} className={`text-[11px] px-2 py-1 rounded border ${newExerciseIds.includes(ex.exercise_id)?'bg-primary text-primary-foreground border-primary':'hover:bg-muted'}`}>{ex.name}</button>
                 ))}
+                {filteredExercises.length === 0 && (
+                  <div className="text-xs text-muted-foreground py-2">No exercises match your filters.</div>
+                )}
               </div>
               {newExerciseIds.length>0 && (
                 <div className="text-[11px] text-muted-foreground">Order: {newExerciseIds.map((id,idx)=>`${idx+1}. ${exercises.find(e=>e.exercise_id===id)?.name||'?'}`).join(', ')}</div>

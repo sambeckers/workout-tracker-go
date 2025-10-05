@@ -211,10 +211,6 @@ const Settings = () => {
           duration: 45
         }
       ],
-      goals: [
-        { id: 1, title: "Run 5km", target: "5km", current: "4.2km", deadline: "2024-12-31" },
-        { id: 2, title: "Bench Press 100kg", target: "100kg", current: "85kg", deadline: "2024-11-30" }
-      ],
       exportDate: new Date().toISOString()
     };
 
