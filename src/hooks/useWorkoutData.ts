@@ -75,6 +75,30 @@ export interface Goal {
   updated_at: string;
 }
 
+// =============================
+// Workout Templates (new feature)
+// =============================
+export interface WorkoutTemplate {
+  template_id: string;
+  user_id: string;
+  template_name: string;
+  notes?: string | null;
+  use_count: number;
+  last_used?: string | null;
+  created_at: string;
+  updated_at: string;
+  exercises?: WorkoutTemplateExercise[]; // joined convenience
+}
+
+export interface WorkoutTemplateExercise {
+  id: number;
+  template_id: string;
+  exercise_id: string;
+  exercise_order: number;
+  created_at: string;
+  exercise?: Exercise; // join helper
+}
+
 export const useWorkoutSessions = () => {
   const { user } = useAuth();
   
@@ -489,6 +513,140 @@ export const useProgressData = () => {
     },
     enabled: !!user?.id,
   });
+};
+
+// =============================
+// Template Hooks
+// =============================
+export const useWorkoutTemplates = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['workout-templates', user?.id],
+    queryFn: async () => {
+      if(!user?.id) throw new Error('User not authenticated');
+      // Cast supabase to any because generated types don't yet include new tables
+      const { data, error } = await (supabase as any)
+        .from('workout_templates')
+        .select('*, workout_template_exercises:workout_template_exercises(*, exercise:exercises(*))')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+      if(error) throw error;
+      return (data || []).map((t: any) => ({
+        ...t,
+        exercises: (t.workout_template_exercises || []).sort((a: any,b: any)=>a.exercise_order-b.exercise_order)
+      })) as WorkoutTemplate[];
+    },
+    enabled: !!user?.id,
+  });
+};
+
+export const useCreateWorkoutTemplate = () => {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { template_name: string; notes?: string | null; exercises: { exercise_id: string; exercise_order: number; }[] }) => {
+      if(!user?.id) throw new Error('User not authenticated');
+      const { data: tpl, error: tplErr } = await (supabase as any)
+        .from('workout_templates')
+        .insert({ template_name: input.template_name, notes: input.notes || null, user_id: user.id })
+        .select()
+        .single();
+      if(tplErr){
+        console.error('[create template] insert error', tplErr);
+        throw tplErr;
+      }
+      if(input.exercises.length){
+        const rows = input.exercises.map(e=>({ template_id: tpl.template_id, exercise_id: e.exercise_id, exercise_order: e.exercise_order }));
+        const { error: exErr } = await (supabase as any).from('workout_template_exercises').insert(rows);
+        if(exErr){
+          console.error('[create template] insert exercises error', exErr);
+          throw exErr;
+        }
+      }
+      return tpl as WorkoutTemplate;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workout-templates'] });
+      toast.success('Template created');
+    },
+    onError: (e) => { toast.error('Failed to create template'); console.error(e); }
+  });
+};
+
+export const useUpdateWorkoutTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { template_id: string; template_name?: string; notes?: string | null; exercises?: { exercise_id: string; exercise_order: number; id?: number }[] }) => {
+      const { template_id, template_name, notes, exercises } = input;
+      if(template_name!=null || notes!==undefined){
+        const { error: upErr } = await (supabase as any)
+          .from('workout_templates')
+          .update({ template_name: template_name, notes })
+          .eq('template_id', template_id);
+        if(upErr) throw upErr;
+      }
+      if(exercises){
+        const { error: delErr } = await (supabase as any)
+          .from('workout_template_exercises')
+          .delete()
+          .eq('template_id', template_id);
+        if(delErr) throw delErr;
+        if(exercises.length){
+          const rows = exercises.map(e=>({ template_id, exercise_id: e.exercise_id, exercise_order: e.exercise_order }));
+          const { error: insErr } = await (supabase as any).from('workout_template_exercises').insert(rows);
+          if(insErr) throw insErr;
+        }
+      }
+      return template_id;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workout-templates'] }); toast.success('Template updated'); },
+    onError: (e) => { toast.error('Failed to update template'); console.error(e); }
+  });
+};
+
+export const useDeleteWorkoutTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (template_id: string) => {
+      const { error } = await (supabase as any).from('workout_templates').delete().eq('template_id', template_id);
+      if(error) throw error;
+      return template_id;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workout-templates'] }); toast.success('Template deleted'); },
+    onError: (e) => { toast.error('Failed to delete template'); console.error(e); }
+  });
+};
+
+export const useRegisterTemplateUse = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (template_id: string) => {
+      // RPC not yet defined in code-generated types; do manual update
+      const { data: tpl, error: fetchErr } = await (supabase as any).from('workout_templates').select('use_count').eq('template_id', template_id).single();
+      if(fetchErr) throw fetchErr;
+      const { error: upErr } = await (supabase as any).from('workout_templates').update({ use_count: (tpl?.use_count||0)+1, last_used: new Date().toISOString() }).eq('template_id', template_id);
+      if(upErr) throw upErr;
+      return template_id;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['workout-templates'] }); },
+    onError: (e) => { console.warn('Template use tracking failed', e); }
+  });
+};
+
+// Recommendation scoring utility
+export const scoreTemplates = (templates: WorkoutTemplate[]): { template: WorkoutTemplate; score: number; reason: string; }[] => {
+  const now = Date.now();
+  return templates.map(t => {
+    const last = t.last_used ? new Date(t.last_used).getTime() : 0;
+    const days = last ? (now - last)/(1000*60*60*24) : 999;
+    // Recentness score (inverse days, cap at 30d)
+    const recentness = Math.max(0, 1 - Math.min(days, 30)/30);
+    // Frequency normalized (log scale)
+    const freq = Math.min(1, Math.log10((t.use_count||0)+1)/Math.log10(20));
+    const score = recentness*0.7 + freq*0.3;
+    const reason = recentness >= 0.5 ? 'Recently used' : (freq >= 0.4 ? 'Frequently used' : 'Suggested');
+    return { template: t, score, reason };
+  }).sort((a,b)=>b.score-a.score);
 };
 
 export const useExportWorkoutData = () => {

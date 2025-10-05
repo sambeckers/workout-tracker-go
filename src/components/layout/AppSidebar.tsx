@@ -46,6 +46,7 @@ const AppSidebar = () => {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Schedule", path: "/dashboard/schedule" },
     { icon: Book, label: "Exercises", path: "/dashboard/exercises" },
+    { icon: Book, label: "Templates", path: "/dashboard/templates" },
     { icon: Target, label: "Goals", path: "/dashboard/goals" },
     { icon: TrendingUp, label: "Progress", path: "/dashboard/progress" },
     { icon: Trash2, label: "Bin", path: "/dashboard/bin" },

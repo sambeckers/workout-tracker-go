@@ -20,6 +20,7 @@ import Schedule from "./pages/Schedule";
 import Exercises from "./pages/Exercises";
 import Goals from "./pages/Goals";
 import Progress from "./pages/Progress";
+import Templates from "./pages/Templates";
 import WorkoutSession from "./pages/WorkoutSession";
 import WorkoutPlanner from "./pages/WorkoutPlanner";
 import Help from "./pages/Help";
@@ -81,6 +82,7 @@ const App = () => (
                                      <Route path="/exercises" element={<Exercises />} />
                                      <Route path="/goals" element={<Goals />} />
                                      <Route path="/progress" element={<Progress />} />
+                                     <Route path="/templates" element={<Templates />} />
                                      <Route path="/workout/:id" element={<WorkoutSession />} />
                                      <Route path="/workout/new" element={<WorkoutSession />} />
                                      <Route path="/workout/quick" element={<WorkoutSession />} />
