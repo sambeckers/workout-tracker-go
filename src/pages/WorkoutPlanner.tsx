@@ -34,6 +34,7 @@ interface SelectedExercise {
   target_weight?: number; // stored in kg
   target_duration_sec?: number; // optional per set duration
   target_distance_km?: number; // for distance-based exercises
+  target_pace?: number; // min/km for cardio exercises
   duration_unit?: 'sec' | 'min' | 'hr';
   distance_unit?: 'm' | 'km';
   suggestion?: string; // progressive suggestion text
@@ -932,6 +933,57 @@ const WorkoutPlanner = () => {
                                  />
                                </div>
                              )}
+                             {showDistance && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Distance</Label>
+                                  <div className="flex flex-col gap-2">
+                                    <NumberStepper
+                                      value={exercise.target_distance_km || 0}
+                                      onChange={(v) => {
+                                        updateExercise(index, 'target_distance_km', v);
+                                        // Auto-calculate time if pace is set
+                                        if (showTime && exercise.target_pace && v > 0) {
+                                          const durationMin = v * exercise.target_pace;
+                                          updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
+                                        }
+                                      }}
+                                      min={0}
+                                      max={exercise.distance_unit === 'm' ? 100000 : 200}
+                                      step={exercise.distance_unit === 'm' ? 10 : 0.5}
+                                      buttonStep={exercise.distance_unit === 'm' ? 100 : 5}
+                                      unit=""
+                                    />
+                                    <div className="flex justify-start">
+                                      <UnitToggle
+                                        units={['m', 'km']}
+                                        value={exercise.distance_unit || 'km'}
+                                        onChange={(unit) => updateExercise(index, 'distance_unit', unit)}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {showTime && showDistance && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Target Pace [min/km]</Label>
+                                  <NumberStepper
+                                    value={exercise.target_pace || 5}
+                                    onChange={(v) => {
+                                      updateExercise(index, 'target_pace', v);
+                                      // Auto-calculate time based on distance × pace
+                                      if (exercise.target_distance_km && exercise.target_distance_km > 0) {
+                                        const durationMin = exercise.target_distance_km * v;
+                                        updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
+                                      }
+                                    }}
+                                    min={1}
+                                    max={30}
+                                    step={0.5}
+                                    buttonStep={1}
+                                    unit="min/km"
+                                  />
+                                </div>
+                              )}
                               {showTime && (
                                 <div className="space-y-2">
                                   <Label className="text-sm">Duration</Label>
@@ -950,29 +1002,6 @@ const WorkoutPlanner = () => {
                                         units={['sec', 'min', 'hr']}
                                         value={exercise.duration_unit || 'min'}
                                         onChange={(unit) => updateExercise(index, 'duration_unit', unit)}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              {showDistance && (
-                                <div className="space-y-2">
-                                  <Label className="text-sm">Distance</Label>
-                                  <div className="flex flex-col gap-2">
-                                    <NumberStepper
-                                      value={exercise.target_distance_km || 0}
-                                      onChange={(v) => updateExercise(index, 'target_distance_km', v)}
-                                      min={0}
-                                      max={exercise.distance_unit === 'm' ? 100000 : 200}
-                                      step={exercise.distance_unit === 'm' ? 10 : 0.5}
-                                      buttonStep={exercise.distance_unit === 'm' ? 100 : 5}
-                                      unit=""
-                                    />
-                                    <div className="flex justify-start">
-                                      <UnitToggle
-                                        units={['m', 'km']}
-                                        value={exercise.distance_unit || 'km'}
-                                        onChange={(unit) => updateExercise(index, 'distance_unit', unit)}
                                       />
                                     </div>
                                   </div>

@@ -37,6 +37,7 @@ interface ExerciseWithSets {
   metric_reps?: boolean; 
   metric_distance?: boolean; 
   distanceKm?: number; // captured when distance metric active
+  targetPace?: number; // min/km for cardio exercises
   duration_unit?: 'sec' | 'min' | 'hr';
   distance_unit?: 'm' | 'km';
 }
@@ -919,6 +920,73 @@ const WorkoutSession = () => {
                 <div className="flex flex-wrap items-center gap-3">
                   {(exercise.mode||'sets')==='time' ? (
                     <>
+                      {exercise.metric_distance && (
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm shrink-0">Distance:</label>
+                              <NumberStepper
+                                value={getDisplayDistance(exercise)}
+                                onChange={(v) => {
+                                  setDisplayDistance(exercise.id, v);
+                                  // Auto-calculate time if pace is set
+                                  if (exercise.targetPace && v > 0) {
+                                    const durationMin = v * exercise.targetPace;
+                                    setExercises(p=>p.map(ex=>{
+                                      if(ex.id!==exercise.id) return ex;
+                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
+                                    }));
+                                  }
+                                  setHasUnsavedChanges(true);
+                                }}
+                                min={0}
+                                max={exercise.distance_unit === 'm' ? 50000 : 50}
+                                step={exercise.distance_unit === 'm' ? 50 : 0.5}
+                                unit=""
+                                className="flex-1 min-w-[180px]"
+                              />
+                            </div>
+                            <div className="flex justify-start">
+                              <UnitToggle
+                                units={['m','km']}
+                                value={exercise.distance_unit || 'km'}
+                                onChange={(unit)=>{
+                                  setHasUnsavedChanges(true);
+                                  setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, distance_unit: unit as any }; }));
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {exercise.metric_distance && (
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm shrink-0">Pace [min/km]:</label>
+                            <NumberStepper
+                              value={exercise.targetPace || 5}
+                              onChange={(v) => {
+                                setHasUnsavedChanges(true);
+                                setExercises(p=>p.map(ex=>{
+                                  if(ex.id!==exercise.id) return ex;
+                                  // Auto-calculate time based on distance × pace
+                                  const distance = ex.distanceKm || 0;
+                                  if (distance > 0) {
+                                    const durationMin = distance * v;
+                                    return { ...ex, targetPace: v, durationSeconds: Math.round(durationMin * 60) };
+                                  }
+                                  return { ...ex, targetPace: v };
+                                }));
+                              }}
+                              min={1}
+                              max={30}
+                              step={0.5}
+                              unit="min/km"
+                              className="flex-1 min-w-[180px]"
+                            />
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
@@ -945,34 +1013,6 @@ const WorkoutSession = () => {
                           </div>
                         </div>
                       </div>
-                      {exercise.metric_distance && (
-                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <label className="text-sm shrink-0">Distance:</label>
-                              <NumberStepper
-                                value={getDisplayDistance(exercise)}
-                                onChange={(v) => setDisplayDistance(exercise.id, v)}
-                                min={0}
-                                max={exercise.distance_unit === 'm' ? 50000 : 50}
-                                step={exercise.distance_unit === 'm' ? 50 : 0.5}
-                                unit=""
-                                className="flex-1 min-w-[180px]"
-                              />
-                            </div>
-                            <div className="flex justify-start">
-                              <UnitToggle
-                                units={['m','km']}
-                                value={exercise.distance_unit || 'km'}
-                                onChange={(unit)=>{
-                                  setHasUnsavedChanges(true);
-                                  setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, distance_unit: unit as any }; }));
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
                       <div className="ml-auto flex items-center gap-2 shrink-0">
                         {exercise.timeCompleted ? (
                           <Button variant="outline" size="sm" className="border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20" onClick={()=>setTimeCompleted(exercise.id,false)} title="Mark incomplete">Undo</Button>
@@ -1033,6 +1073,69 @@ const WorkoutSession = () => {
                 <div className="space-y-3">
                   {(exercise.mode||'sets')==='time' ? (
                     <div className="p-4 rounded-lg bg-muted/50 space-y-4">
+                      {exercise.metric_distance && (
+                        <>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium w-20">Distance:</label>
+                              <NumberStepper
+                                value={getDisplayDistance(exercise)}
+                                onChange={(v) => {
+                                  setDisplayDistance(exercise.id, v);
+                                  // Auto-calculate time if pace is set
+                                  if (exercise.targetPace && v > 0) {
+                                    const durationMin = v * exercise.targetPace;
+                                    setExercises(p=>p.map(ex=>{
+                                      if(ex.id!==exercise.id) return ex;
+                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
+                                    }));
+                                  }
+                                  setHasUnsavedChanges(true);
+                                }}
+                                min={0}
+                                max={exercise.distance_unit === 'm' ? 50000 : 50}
+                                step={exercise.distance_unit === 'm' ? 50 : 0.5}
+                                unit=""
+                                className="flex-1"
+                              />
+                            </div>
+                            <div className="flex justify-start">
+                              <UnitToggle
+                                units={['m','km']}
+                                value={exercise.distance_unit || 'km'}
+                                onChange={(unit)=>{
+                                  setHasUnsavedChanges(true);
+                                  setExercises(p=>p.map(ex=>{ if(ex.id!==exercise.id) return ex; return { ...ex, distance_unit: unit as any }; }));
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium w-20">Pace:</label>
+                            <NumberStepper
+                              value={exercise.targetPace || 5}
+                              onChange={(v) => {
+                                setHasUnsavedChanges(true);
+                                setExercises(p=>p.map(ex=>{
+                                  if(ex.id!==exercise.id) return ex;
+                                  // Auto-calculate time based on distance × pace
+                                  const distance = ex.distanceKm || 0;
+                                  if (distance > 0) {
+                                    const durationMin = distance * v;
+                                    return { ...ex, targetPace: v, durationSeconds: Math.round(durationMin * 60) };
+                                  }
+                                  return { ...ex, targetPace: v };
+                                }));
+                              }}
+                              min={1}
+                              max={30}
+                              step={0.5}
+                              unit="min/km"
+                              className="flex-1"
+                            />
+                          </div>
+                        </>
+                      )}
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <label className="text-sm font-medium w-20">Duration:</label>
