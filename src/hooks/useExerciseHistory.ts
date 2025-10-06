@@ -24,7 +24,7 @@ export const useExerciseLastLog = (exerciseId: string) => {
         .eq('exercise_id', exerciseId)
         .eq('session.user_id', user.id)
         .eq('session.status', 'Done')
-        .order('created_at', { ascending: false })
+        .order('session.date', { ascending: false })
         .limit(1)
         .maybeSingle();
       
@@ -59,7 +59,7 @@ export const useExerciseHistory = (exerciseId: string, limit: number = 25, exerc
         .eq('exercise_id', exerciseId)
         .eq('session.user_id', user.id)
         .eq('session.status', 'Done')
-        .order('created_at', { ascending: false })
+        .order('session.date', { ascending: false })
         .limit(limit);
         if (error) throw error;
         if (data && data.length > 0) return data as (ExerciseLog & { session: { date: string } })[];
@@ -76,7 +76,7 @@ export const useExerciseHistory = (exerciseId: string, limit: number = 25, exerc
           `)
           .eq('session.user_id', user.id)
           .eq('session.status', 'Done')
-          .order('created_at', { ascending: false })
+          .order('session.date', { ascending: false })
           .limit(200);
         if (nameErr) throw nameErr;
         const filtered = (nameData||[]).filter((row: any) => row.exercise?.name?.toLowerCase() === exerciseName.toLowerCase()).map((row:any) => {

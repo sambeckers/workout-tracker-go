@@ -7,7 +7,6 @@ import { ThemeProvider } from "next-themes";
 import { ThemeProvider as CustomThemeProvider } from "@/contexts/ThemeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { DevModeProvider } from "@/contexts/DevModeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppSidebar from "@/components/layout/AppSidebar";
 import CoverArea from "@/components/layout/CoverArea";
@@ -46,7 +45,6 @@ const App = () => (
     >
       <CustomThemeProvider>
         <AuthProvider>
-          <DevModeProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
@@ -63,7 +61,7 @@ const App = () => (
                   
                   {/* Main app routes - using real auth but fallback to dev mode if no user */}
                   <Route path="/dashboard/*" element={
-                    <ProtectedRoute allowDevMode={true}>
+                    <ProtectedRoute>
                       <UnitPreferenceProvider>
                         <SidebarProvider>
                           <div className="flex min-h-screen w-full bg-background">
@@ -100,7 +98,6 @@ const App = () => (
                 </Routes>
               </BrowserRouter>
               </TooltipProvider>
-            </DevModeProvider>
         </AuthProvider>
       </CustomThemeProvider>
     </ThemeProvider>

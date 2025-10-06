@@ -1,11 +1,10 @@
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Calendar, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, Code, UserCheck, Flame, HelpCircle, Trash2 } from "lucide-react";
+import { Calendar, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, Flame, HelpCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDevMode } from "@/contexts/DevModeContext";
 import { cn } from "@/lib/utils";
 import {
   Sidebar,
@@ -25,17 +24,6 @@ const AppSidebar = () => {
   const { open } = useSidebar();
   const { toast } = useToast();
   const { user, signOut } = useAuth();
-  const { isDevMode, toggleDevMode } = useDevMode();
-
-  // Mock user for development mode
-  const mockUser = {
-    user_metadata: { name: "Dev User", avatar_url: "" },
-    email: "dev@example.com"
-  };
-  
-  // Determine which user to display based on dev mode and authentication status
-  const displayUser = isDevMode ? mockUser : (user || mockUser);
-  const isUsingRealUser = !isDevMode && user;
 
   const mainNavItems = [
     { icon: Home, label: "Home", path: "/dashboard" },
@@ -61,31 +49,6 @@ const AppSidebar = () => {
     navigate("/dashboard/settings");
   };
 
-  const handleDevModeToggle = () => {
-    toggleDevMode();
-    if (isDevMode) {
-      // Switching from dev mode to user mode
-      if (user) {
-        toast({
-          title: "Switched to User Account",
-          description: `Now using your authenticated account: ${user.email}`,
-        });
-      } else {
-        toast({
-          title: "No User Account",
-          description: "Please log in to use user account mode.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      // Switching from user mode to dev mode
-      toast({
-        title: "Switched to Dev Mode",
-        description: "Now using development mode with mock data.",
-      });
-    }
-  };
-
   return (
     <Sidebar className={open ? "w-64" : "w-14"}>
       <SidebarContent>
@@ -105,11 +68,11 @@ const AppSidebar = () => {
         {/* User Profile */}
         <div className="flex items-center gap-3 p-4 border-b border-sidebar-border">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={displayUser?.user_metadata?.avatar_url} />
+            <AvatarImage src={user?.user_metadata?.avatar_url} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-              {displayUser?.user_metadata?.name ? 
-                displayUser.user_metadata.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() :
-                displayUser?.email?.charAt(0).toUpperCase()
+              {user?.user_metadata?.name ? 
+                user.user_metadata.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() :
+                user?.email?.charAt(0).toUpperCase()
               }
             </AvatarFallback>
           </Avatar>
@@ -117,9 +80,9 @@ const AppSidebar = () => {
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-primary truncate">
-                  {displayUser?.user_metadata?.name || displayUser?.email?.split('@')[0] || 'User'}
+                  {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
                 </p>
-                <p className="text-xs text-sidebar-foreground truncate">{displayUser?.email}</p>
+                <p className="text-xs text-sidebar-foreground truncate">{user?.email}</p>
               </div>
               <button 
                 className="inline-flex items-center justify-center h-8 w-8 rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
@@ -135,67 +98,6 @@ const AppSidebar = () => {
             </>
           )}
         </div>
-
-        {/* Dev Mode Toggle */}
-        {open && (
-          <div className="px-4 py-2 border-b border-sidebar-border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {isDevMode ? (
-                  <Code className="h-4 w-4 text-orange-500" />
-                ) : (
-                  <UserCheck className="h-4 w-4 text-green-500" />
-                )}
-                <span className="text-xs font-medium text-sidebar-foreground">
-                  Mode: {isDevMode ? "Development" : "User Account"}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(!user && isDevMode) ? () => navigate("/login") : handleDevModeToggle}
-                className="h-6 px-2 text-xs"
-              >
-                {(!user && isDevMode) ? "Login" : (isDevMode ? "Use Account" : "Dev Mode")}
-              </Button>
-            </div>
-            {isUsingRealUser && (
-              <p className="text-xs text-green-600 mt-1">✓ Authenticated as {user?.email}</p>
-            )}
-            {isDevMode && user && (
-              <div className="mt-1 space-y-1">
-                <p className="text-xs text-orange-600">Dev mode active (real user available)</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    handleDevModeToggle();
-                    toast({
-                      title: "Switched to Your Account",
-                      description: `Now using your authenticated account: ${user.email}`,
-                    });
-                  }}
-                  className="h-6 w-full text-xs text-green-600 hover:text-green-700"
-                >
-                  Switch to Your Account
-                </Button>
-              </div>
-            )}
-            {!user && (
-              <div className="mt-2 space-y-1">
-                <p className="text-xs text-gray-500">No authenticated user - dev mode only</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/login")}
-                  className="h-7 w-full text-xs"
-                >
-                  Login as User
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -256,24 +158,22 @@ const AppSidebar = () => {
                     <span>Settings</span>
                   </Link>
                 </SidebarMenuItem>
-                {isUsingRealUser && (
-                  <SidebarMenuItem>
-                    <button
-                      onClick={async () => {
-                        await signOut();
-                        navigate("/");
-                        toast({
-                          title: "Signed out",
-                          description: "You have been successfully signed out.",
-                        });
-                      }}
-                      className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors text-red-600 hover:text-red-700"
-                    >
-                      <User className="h-4 w-4" />
-                      <span>Sign Out</span>
-                    </button>
-                  </SidebarMenuItem>
-                )}
+                <SidebarMenuItem>
+                  <button
+                    onClick={async () => {
+                      await signOut();
+                      navigate("/");
+                      toast({
+                        title: "Signed out",
+                        description: "You have been successfully signed out.",
+                      });
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors text-red-600 hover:text-red-700"
+                  >
+                    <User className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
