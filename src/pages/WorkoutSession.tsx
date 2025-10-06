@@ -528,13 +528,24 @@ const WorkoutSession = () => {
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
     
-    // If marking as Done, complete all sets/exercises
+    // Update all sets based on the new status
     if(next==='Done'){
+      // If marking as Done, complete all sets/exercises
       setExercises(prev=>prev.map(ex=>{
         if(ex.mode==='time'){
           return {...ex, timeCompleted:true};
         } else {
           return {...ex, sets:ex.sets.map(s=>({...s, completed:true}))};
+        }
+      }));
+      setHasUnsavedChanges(true);
+    } else {
+      // If reverting to Planned, uncomplete all sets/exercises
+      setExercises(prev=>prev.map(ex=>{
+        if(ex.mode==='time'){
+          return {...ex, timeCompleted:false};
+        } else {
+          return {...ex, sets:ex.sets.map(s=>({...s, completed:false}))};
         }
       }));
       setHasUnsavedChanges(true);
