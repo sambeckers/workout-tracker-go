@@ -543,12 +543,18 @@ export const useProgressData = () => {
         `)
         .eq('session.user_id', user.id)
         .eq('session.status', 'Done')
-        .is('session.deleted_at', null)
-        .order('session.date', { ascending: true });
+        .is('session.deleted_at', null);
       
       if (logsError) throw logsError;
       
-      return { sessions, logs };
+      // Sort logs by session date in JavaScript
+      const sortedLogs = (logs || []).sort((a: any, b: any) => {
+        const dateA = a.session?.date || '';
+        const dateB = b.session?.date || '';
+        return dateA.localeCompare(dateB);
+      });
+      
+      return { sessions, logs: sortedLogs };
     },
     enabled: !!user?.id,
   });
