@@ -995,15 +995,20 @@ const WorkoutSession = () => {
                                 value={getDisplayDistance(exercise)}
                                 onChange={(v) => {
                                   setDisplayDistance(exercise.id, v);
-                                  // Auto-calculate time if pace is set
-                                  if (exercise.targetPace && v > 0) {
-                                    const durationMin = v * exercise.targetPace;
-                                    setExercises(p=>p.map(ex=>{
-                                      if(ex.id!==exercise.id) return ex;
-                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
-                                    }));
-                                  }
                                   setHasUnsavedChanges(true);
+                                  // Auto-calculate time if pace is set, OR auto-calculate pace if time is set
+                                  setExercises(p=>p.map(ex=>{
+                                    if(ex.id!==exercise.id) return ex;
+                                    if (ex.targetPace && v > 0) {
+                                      const durationMin = v * ex.targetPace;
+                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
+                                    } else if (ex.durationSeconds && v > 0) {
+                                      const durationMin = ex.durationSeconds / 60;
+                                      const pace = durationMin / v;
+                                      return { ...ex, targetPace: pace };
+                                    }
+                                    return ex;
+                                  }));
                                 }}
                                 min={0}
                                 max={exercise.distance_unit === 'm' ? 50000 : 50}
@@ -1084,7 +1089,21 @@ const WorkoutSession = () => {
                             <label className="text-sm shrink-0">Time:</label>
                             <NumberStepper
                               value={getDisplayDuration(exercise)}
-                              onChange={(v) => setDisplayDuration(exercise.id, v)}
+                              onChange={(v) => {
+                                setDisplayDuration(exercise.id, v);
+                                // Auto-calculate pace if distance is set
+                                if (exercise.distanceKm && exercise.distanceKm > 0) {
+                                  setExercises(p=>p.map(ex=>{
+                                    if(ex.id!==exercise.id) return ex;
+                                    let seconds = v;
+                                    if(ex.duration_unit==='min') seconds = v * 60;
+                                    else if(ex.duration_unit==='hr') seconds = v * 3600;
+                                    const durationMin = seconds / 60;
+                                    const pace = durationMin / (ex.distanceKm || 1);
+                                    return { ...ex, targetPace: pace };
+                                  }));
+                                }
+                              }}
                               min={0}
                               max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
                               step={exercise.duration_unit === 'hr' ? 0.5 : exercise.duration_unit === 'min' ? 0.5 : 5}
@@ -1173,15 +1192,20 @@ const WorkoutSession = () => {
                                 value={getDisplayDistance(exercise)}
                                 onChange={(v) => {
                                   setDisplayDistance(exercise.id, v);
-                                  // Auto-calculate time if pace is set
-                                  if (exercise.targetPace && v > 0) {
-                                    const durationMin = v * exercise.targetPace;
-                                    setExercises(p=>p.map(ex=>{
-                                      if(ex.id!==exercise.id) return ex;
-                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
-                                    }));
-                                  }
                                   setHasUnsavedChanges(true);
+                                  // Auto-calculate time if pace is set, OR auto-calculate pace if time is set
+                                  setExercises(p=>p.map(ex=>{
+                                    if(ex.id!==exercise.id) return ex;
+                                    if (ex.targetPace && v > 0) {
+                                      const durationMin = v * ex.targetPace;
+                                      return { ...ex, durationSeconds: Math.round(durationMin * 60) };
+                                    } else if (ex.durationSeconds && v > 0) {
+                                      const durationMin = ex.durationSeconds / 60;
+                                      const pace = durationMin / v;
+                                      return { ...ex, targetPace: pace };
+                                    }
+                                    return ex;
+                                  }));
                                 }}
                                 min={0}
                                 max={exercise.distance_unit === 'm' ? 50000 : 50}
@@ -1257,7 +1281,21 @@ const WorkoutSession = () => {
                           <label className="text-sm font-medium w-20">Duration:</label>
                           <NumberStepper
                             value={getDisplayDuration(exercise)}
-                            onChange={(v) => setDisplayDuration(exercise.id, v)}
+                            onChange={(v) => {
+                              setDisplayDuration(exercise.id, v);
+                              // Auto-calculate pace if distance is set
+                              if (exercise.distanceKm && exercise.distanceKm > 0) {
+                                setExercises(p=>p.map(ex=>{
+                                  if(ex.id!==exercise.id) return ex;
+                                  let seconds = v;
+                                  if(ex.duration_unit==='min') seconds = v * 60;
+                                  else if(ex.duration_unit==='hr') seconds = v * 3600;
+                                  const durationMin = seconds / 60;
+                                  const pace = durationMin / (ex.distanceKm || 1);
+                                  return { ...ex, targetPace: pace };
+                                }));
+                              }
+                            }}
                             min={0}
                             max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
                             step={exercise.duration_unit === 'hr' ? 0.5 : exercise.duration_unit === 'min' ? 0.5 : 5}
@@ -1279,7 +1317,18 @@ const WorkoutSession = () => {
                             <label className="text-sm font-medium w-20">Distance:</label>
                             <NumberStepper
                               value={getDisplayDistance(exercise)}
-                              onChange={(v) => setDisplayDistance(exercise.id, v)}
+                              onChange={(v) => {
+                                setDisplayDistance(exercise.id, v);
+                                // Auto-calculate pace if time is set
+                                if (exercise.durationSeconds && v > 0) {
+                                  setExercises(p=>p.map(ex=>{
+                                    if(ex.id!==exercise.id) return ex;
+                                    const durationMin = ex.durationSeconds / 60;
+                                    const pace = durationMin / v;
+                                    return { ...ex, targetPace: pace };
+                                  }));
+                                }
+                              }}
                               min={0}
                               max={exercise.distance_unit === 'm' ? 50000 : 50}
                               step={exercise.distance_unit === 'm' ? 50 : 0.5}

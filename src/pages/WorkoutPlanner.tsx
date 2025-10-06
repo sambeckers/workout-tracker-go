@@ -982,15 +982,23 @@ const WorkoutPlanner = () => {
                                 <div className="space-y-2">
                                   <Label className="text-sm">Distance</Label>
                                   <div className="flex flex-col gap-2">
-                                    <NumberStepper
-                                      value={getDisplayDistance(exercise)}
-                                      onChange={(v) => setDisplayDistance(index, v)}
-                                      min={0}
-                                      max={exercise.distance_unit === 'm' ? 100000 : 200}
-                                      step={exercise.distance_unit === 'm' ? 10 : 0.5}
-                                      buttonStep={exercise.distance_unit === 'm' ? 100 : 5}
-                                      unit=""
-                                    />
+                                     <NumberStepper
+                                       value={getDisplayDistance(exercise)}
+                                       onChange={(v) => {
+                                         setDisplayDistance(index, v);
+                                         // Auto-calculate pace if time is set
+                                         if (exercise.target_duration_sec && v > 0) {
+                                           const durationMin = exercise.target_duration_sec;
+                                           const pace = durationMin / v;
+                                           updateExercise(index, 'target_pace', pace);
+                                         }
+                                       }}
+                                       min={0}
+                                       max={exercise.distance_unit === 'm' ? 100000 : 200}
+                                       step={exercise.distance_unit === 'm' ? 10 : 0.5}
+                                       buttonStep={exercise.distance_unit === 'm' ? 100 : 5}
+                                       unit=""
+                                     />
                                     <div className="flex justify-start">
                                       <UnitToggle
                                         units={['m', 'km']}
@@ -1054,15 +1062,22 @@ const WorkoutPlanner = () => {
                                 <div className="space-y-2">
                                   <Label className="text-sm">Duration</Label>
                                   <div className="flex flex-col gap-2">
-                                    <NumberStepper
-                                      value={getDisplayDuration(exercise)}
-                                      onChange={(v) => setDisplayDuration(index, v)}
-                                      min={1}
-                                      max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
-                                      step={exercise.duration_unit === 'hr' ? 0.25 : exercise.duration_unit === 'min' ? 0.5 : 5}
-                                      buttonStep={exercise.duration_unit === 'hr' ? 1 : exercise.duration_unit === 'min' ? 5 : 30}
-                                      unit=""
-                                    />
+                                     <NumberStepper
+                                       value={getDisplayDuration(exercise)}
+                                       onChange={(v) => {
+                                         setDisplayDuration(index, v);
+                                         // Auto-calculate pace if distance is set
+                                         if (exercise.target_distance_km && exercise.target_distance_km > 0) {
+                                           const pace = v / exercise.target_distance_km;
+                                           updateExercise(index, 'target_pace', pace);
+                                         }
+                                       }}
+                                       min={1}
+                                       max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
+                                       step={exercise.duration_unit === 'hr' ? 0.25 : exercise.duration_unit === 'min' ? 0.5 : 5}
+                                       buttonStep={exercise.duration_unit === 'hr' ? 1 : exercise.duration_unit === 'min' ? 5 : 30}
+                                       unit=""
+                                     />
                                     <div className="flex justify-start">
                                       <UnitToggle
                                         units={['sec', 'min', 'hr']}
