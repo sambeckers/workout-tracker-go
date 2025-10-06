@@ -1,12 +1,11 @@
-import { useState } from "react";
+
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Calendar, Target, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, ChevronRight, Code, UserCheck, Shield, Flame, HelpCircle, Trash2 } from "lucide-react";
+import { Calendar, TrendingUp, Book, Home, Dumbbell, Plus, Settings, User, Code, UserCheck, Flame, HelpCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
-import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { cn } from "@/lib/utils";
 import {
   Sidebar,
@@ -27,20 +26,16 @@ const AppSidebar = () => {
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const { isDevMode, toggleDevMode } = useDevMode();
-  const { isAdminAuthenticated, adminLogout } = useAdminAuth();
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   // Mock user for development mode
   const mockUser = {
-    user_metadata: { name: "Sam Beckers", avatar_url: "" },
-    email: "sam@example.com"
+    user_metadata: { name: "Dev User", avatar_url: "" },
+    email: "dev@example.com"
   };
   
-  // Determine which user to display based on admin auth, dev mode setting and authentication status
-  const displayUser = (isAdminAuthenticated && isDevMode) ? mockUser : (user || mockUser);
+  // Determine which user to display based on dev mode and authentication status
+  const displayUser = isDevMode ? mockUser : (user || mockUser);
   const isUsingRealUser = !isDevMode && user;
-  const isUsingDevMode = isAdminAuthenticated && (isDevMode || !user);
-  const showDevModeControls = isAdminAuthenticated;
 
   const mainNavItems = [
     { icon: Home, label: "Home", path: "/dashboard" },
@@ -67,11 +62,6 @@ const AppSidebar = () => {
   };
 
   const handleDevModeToggle = () => {
-    if (!isAdminAuthenticated) {
-      // Non-admins cannot toggle dev mode
-      return;
-    }
-
     toggleDevMode();
     if (isDevMode) {
       // Switching from dev mode to user mode
@@ -146,27 +136,27 @@ const AppSidebar = () => {
           )}
         </div>
 
-        {/* Dev Mode Toggle - Only for Admin */}
-        {open && showDevModeControls && (
+        {/* Dev Mode Toggle */}
+        {open && (
           <div className="px-4 py-2 border-b border-sidebar-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {isUsingDevMode ? (
+                {isDevMode ? (
                   <Code className="h-4 w-4 text-orange-500" />
                 ) : (
                   <UserCheck className="h-4 w-4 text-green-500" />
                 )}
                 <span className="text-xs font-medium text-sidebar-foreground">
-                  Mode: {isUsingDevMode ? "Development" : "User Account"}
+                  Mode: {isDevMode ? "Development" : "User Account"}
                 </span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={(!user && isDevMode && isAdminAuthenticated) ? () => navigate("/login") : handleDevModeToggle}
+                onClick={(!user && isDevMode) ? () => navigate("/login") : handleDevModeToggle}
                 className="h-6 px-2 text-xs"
               >
-                {(!user && isDevMode && isAdminAuthenticated) ? "Login" : (isDevMode ? "Use Account" : "Dev Mode")}
+                {(!user && isDevMode) ? "Login" : (isDevMode ? "Use Account" : "Dev Mode")}
               </Button>
             </div>
             {isUsingRealUser && (
@@ -206,8 +196,6 @@ const AppSidebar = () => {
             )}
           </div>
         )}
-
-        {/* Admin Login entry removed to keep UI clean for users */}
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -268,23 +256,6 @@ const AppSidebar = () => {
                     <span>Settings</span>
                   </Link>
                 </SidebarMenuItem>
-                {isAdminAuthenticated && (
-                  <SidebarMenuItem>
-                    <button
-                      onClick={() => {
-                        adminLogout();
-                        toast({
-                          title: "Admin Logout",
-                          description: "You have been logged out of admin mode.",
-                        });
-                      }}
-                      className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer transition-colors text-orange-600 hover:text-orange-700"
-                    >
-                      <Shield className="h-4 w-4" />
-                      <span>Admin Logout</span>
-                    </button>
-                  </SidebarMenuItem>
-                )}
                 {isUsingRealUser && (
                   <SidebarMenuItem>
                     <button
@@ -308,8 +279,6 @@ const AppSidebar = () => {
           </SidebarGroup>
         )}
       </SidebarContent>
-      
-      {/* Admin modal removed; admin activation happens on Login page via username */}
     </Sidebar>
   );
 };

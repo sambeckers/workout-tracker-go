@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { useDevMode } from "@/contexts/DevModeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,38 +19,12 @@ const Login = () => {
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const { signIn, signInWithProvider } = useAuth();
   const { toast } = useToast();
-  const { adminLogin } = useAdminAuth();
-  const { forceDevMode } = useDevMode();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // If input is 'admin', attempt admin authentication to enable dev mode
-    if (emailOrUsername.trim().toLowerCase() === "admin") {
-      const ok = await adminLogin("admin", password);
-      if (ok) {
-        forceDevMode();
-        toast({
-          title: "Admin Mode Activated",
-          description: "Developer mode enabled for 24 hours.",
-        });
-        navigate("/");
-        setLoading(false);
-        return;
-      } else {
-        toast({
-          title: "Invalid Admin Credentials",
-          description: "The admin username or password is incorrect.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Otherwise proceed with normal email/password sign-in
     if (!emailOrUsername) {
       toast({
         title: "Email Required",
@@ -62,8 +34,6 @@ const Login = () => {
       setLoading(false);
       return;
     }
-
-    // Username login is now supported - no need to restrict
 
     const { error } = await signIn(emailOrUsername, password, keepSignedIn);
 
@@ -75,22 +45,12 @@ const Login = () => {
           description: "Please check your email and click the confirmation link before signing in.",
           variant: "destructive",
         });
-      } else if (error.message.includes("Invalid login credentials")) {
+      } else if (error.message.includes("Invalid login credentials") || 
+                 error.message.includes("Username not found") || 
+                 error.message.includes("Username lookup failed")) {
         toast({
           title: "Invalid Credentials",
-          description: "Please check your email/username and password and try again.",
-          variant: "destructive",
-        });
-      } else if (error.message.includes("Username not found")) {
-        toast({
-          title: "Username Not Found",
-          description: "No account found with that username. Please check and try again.",
-          variant: "destructive",
-        });
-      } else if (error.message.includes("Username lookup failed")) {
-        toast({
-          title: "Login Error",
-          description: "Unable to process username login. Please try using your email address.",
+          description: "The email/username or password you entered is incorrect.",
           variant: "destructive",
         });
       } else {

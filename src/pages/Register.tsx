@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Dumbbell, Eye, EyeOff, Mail, Lock, User } from "lucide-react";
+import { registerSchema } from "@/lib/validationSchemas";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -27,19 +28,21 @@ const Register = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Validate form data using Zod schema
+    const validationResult = registerSchema.safeParse({
+      name,
+      username,
+      email,
+      password,
+      confirmPassword,
+    });
 
-    if (password.length < 6) {
+    if (!validationResult.success) {
+      // Display validation errors
+      const errors = validationResult.error.errors;
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long.",
+        title: "Validation Error",
+        description: errors[0].message,
         variant: "destructive",
       });
       return;
@@ -265,12 +268,12 @@ const Register = () => {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Create a password"
+                    placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10"
                     required
-                    minLength={6}
+                    minLength={12}
                   />
                   <Button
                     type="button"
@@ -286,6 +289,9 @@ const Register = () => {
                     )}
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 12 characters with uppercase, lowercase, number, and special character.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -300,7 +306,7 @@ const Register = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10 pr-10"
                     required
-                    minLength={6}
+                    minLength={12}
                   />
                   <Button
                     type="button"

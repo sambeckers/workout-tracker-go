@@ -8,7 +8,6 @@ import { ThemeProvider as CustomThemeProvider } from "@/contexts/ThemeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DevModeProvider } from "@/contexts/DevModeContext";
-import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppSidebar from "@/components/layout/AppSidebar";
 import CoverArea from "@/components/layout/CoverArea";
@@ -47,9 +46,8 @@ const App = () => (
     >
       <CustomThemeProvider>
         <AuthProvider>
-          <AdminAuthProvider>
-            <DevModeProvider>
-              <TooltipProvider>
+          <DevModeProvider>
+            <TooltipProvider>
               <Toaster />
               <Sonner />
               <BrowserRouter>
@@ -103,7 +101,6 @@ const App = () => (
               </BrowserRouter>
               </TooltipProvider>
             </DevModeProvider>
-          </AdminAuthProvider>
         </AuthProvider>
       </CustomThemeProvider>
     </ThemeProvider>
