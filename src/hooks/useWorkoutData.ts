@@ -116,20 +116,8 @@ export const useWorkoutSessions = () => {
         .order('date', { ascending: false });
       
       if (error) throw error;
-      // Map DB enum values (planned, in_progress, completed, skipped) -> UI values (Planned, Done, Skipped)
-      const mapped = (data || []).map((row: any) => {
-        let status: WorkoutSession['status'] = 'Planned';
-        switch (row.status) {
-          case 'planned': status = 'Planned'; break;
-          case 'completed': status = 'Done'; break;
-          case 'skipped': status = 'Skipped'; break;
-          // Treat in_progress as Planned for now (future: add 'In Progress')
-          case 'in_progress': status = 'Planned'; break;
-          default: status = 'Planned';
-        }
-        return { ...row, status } as WorkoutSession;
-      });
-      return mapped;
+      // DB already uses the correct values (Planned, Done, Skipped)
+      return (data || []) as WorkoutSession[];
     },
     enabled: !!user?.id,
   });
@@ -241,32 +229,15 @@ export const useCreateWorkoutSession = () => {
     mutationFn: async (data: Omit<WorkoutSession, 'session_id' | 'user_id' | 'created_at' | 'updated_at'>) => {
       if (!user?.id) throw new Error('User not authenticated');
       
-      // Map UI status to DB enum
-      let statusForDb: string | undefined = undefined;
-      if (data.status) {
-        switch (data.status) {
-          case 'Planned': statusForDb = 'planned'; break;
-          case 'Done': statusForDb = 'completed'; break;
-          case 'Skipped': statusForDb = 'skipped'; break;
-        }
-      }
-
+      // DB uses same values as UI (Planned, Done, Skipped)
       const { data: result, error } = await supabase
         .from('workout_sessions')
-        .insert({ ...data, status: statusForDb ?? 'planned', user_id: user.id })
+        .insert({ ...data, status: data.status ?? 'Planned', user_id: user.id })
         .select()
         .single();
       
       if (error) throw error;
-      // Map back to UI
-      let status: WorkoutSession['status'] = 'Planned';
-      switch (result.status) {
-        case 'planned': status = 'Planned'; break;
-        case 'completed': status = 'Done'; break;
-        case 'skipped': status = 'Skipped'; break;
-        case 'in_progress': status = 'Planned'; break;
-      }
-      return { ...result, status } as WorkoutSession;
+      return result as WorkoutSession;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
@@ -284,33 +255,16 @@ export const useUpdateWorkoutSession = () => {
   
   return useMutation({
     mutationFn: async ({ sessionId, data }: { sessionId: string; data: Partial<WorkoutSession> }) => {
-      // Translate UI status -> DB enum value before update
-      const translated: any = { ...data };
-      if (data.status) {
-        switch (data.status) {
-          case 'Planned': translated.status = 'planned'; break;
-          case 'Done': translated.status = 'completed'; break;
-          case 'Skipped': translated.status = 'skipped'; break;
-        }
-      }
-
+      // DB uses same values as UI (Planned, Done, Skipped) - no translation needed
       const { data: result, error } = await supabase
         .from('workout_sessions')
-        .update(translated)
+        .update(data)
         .eq('session_id', sessionId)
         .select()
         .single();
       
       if (error) throw error;
-      // Map result back to UI shape
-      let status: WorkoutSession['status'] = 'Planned';
-      switch (result.status) {
-        case 'planned': status = 'Planned'; break;
-        case 'completed': status = 'Done'; break;
-        case 'skipped': status = 'Skipped'; break;
-        case 'in_progress': status = 'Planned'; break;
-      }
-      return { ...result, status } as WorkoutSession;
+      return result as WorkoutSession;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
