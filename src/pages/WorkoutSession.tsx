@@ -242,11 +242,11 @@ const WorkoutSession = () => {
     }
   }, [duration, currentWorkout?.session_id, autoSave.debouncedSaveSession, hasUnsavedChanges, markChangesAndAutoSave]);
 
-  // Auto-save exercise logs when exercises change
-  const autoSaveExerciseLogs = useCallback(() => {
-    if (!currentWorkout || !exercises.length) return;
+  // Helper to build exercise logs from exercises array
+  const buildExerciseLogs = useCallback((exercisesArray: ExerciseWithSets[]) => {
+    if (!currentWorkout) return [];
     
-    const logs = exercises.map((exercise, index) => {
+    return exercisesArray.map((exercise, index) => {
       const baseLog = {
         session_id: currentWorkout.session_id,
         exercise_id: exercise.id,
@@ -295,12 +295,16 @@ const WorkoutSession = () => {
         sets: 0,
       };
     }).filter(Boolean);
+  }, [currentWorkout]);
 
+  // Auto-save exercise logs when exercises change
+  const autoSaveExerciseLogs = useCallback(() => {
+    const logs = buildExerciseLogs(exercises);
     if (logs.length > 0) {
       setSaveState('saving');
       autoSave.debouncedSaveExerciseLogs(logs);
     }
-  }, [exercises, currentWorkout, autoSave.debouncedSaveExerciseLogs]);
+  }, [exercises, buildExerciseLogs, autoSave.debouncedSaveExerciseLogs]);
 
   // Auto-save metadata when changed
   const autoSaveMetadata = useCallback((field: string, value: string) => {
@@ -532,28 +536,34 @@ const WorkoutSession = () => {
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
     
-    // Update all sets based on the new status
-    if(next==='Done'){
-      // If marking as Done, complete all sets/exercises
-      setExercises(prev=>prev.map(ex=>{
+    // Calculate new exercises state with all completed/uncompleted
+    const updatedExercises = exercises.map(ex=>{
+      if(next==='Done'){
+        // Mark all as completed
         if(ex.mode==='time'){
           return {...ex, timeCompleted:true};
         } else {
           return {...ex, sets:ex.sets.map(s=>({...s, completed:true}))};
         }
-      }));
-      setHasUnsavedChanges(true);
-    } else {
-      // If reverting to Planned, uncomplete all sets/exercises
-      setExercises(prev=>prev.map(ex=>{
+      } else {
+        // Mark all as uncompleted
         if(ex.mode==='time'){
           return {...ex, timeCompleted:false};
         } else {
           return {...ex, sets:ex.sets.map(s=>({...s, completed:false}))};
         }
-      }));
-      setHasUnsavedChanges(true);
+      }
+    });
+    
+    // Immediately save exercise logs with the new state (not debounced)
+    const logs = buildExerciseLogs(updatedExercises);
+    if (logs.length > 0) {
+      autoSave.saveExerciseLogsImmediately(logs);
     }
+    
+    // Update local state
+    setExercises(updatedExercises);
+    setHasUnsavedChanges(true);
     
     // Optimistic update: immediately update the query cache
     const queryKey = ['workout-sessions', currentWorkout.user_id];
@@ -570,6 +580,9 @@ const WorkoutSession = () => {
     updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { 
       onSuccess:()=>{ 
         if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
+        setSaveState('saved');
+        setHasUnsavedChanges(false);
+        setTimeout(() => setSaveState('idle'), 2000);
       },
       onError:(err)=>{
         // Rollback on error
