@@ -257,10 +257,13 @@ const WorkoutSession = () => {
       if (exercise.mode === 'time') {
         // Save time-based exercise data (even if not completed yet)
         if (exercise.durationSeconds || exercise.distanceKm) {
+          const isCompleted = exercise.timeCompleted || false;
           const logData: any = {
             ...baseLog,
             duration_seconds: exercise.durationSeconds || 0,
             duration_unit: exercise.duration_unit || 'min',
+            completed: isCompleted,
+            completed_at: isCompleted ? new Date().toISOString() : null,
           };
           
           if (exercise.metric_distance && exercise.distanceKm) {
@@ -271,11 +274,14 @@ const WorkoutSession = () => {
           return logData;
         }
       } else {
-        // Save all sets with current values (not just completed ones)
+        // Save all sets with current values and completion state
         if (exercise.sets.length > 0) {
+          const allSetsCompleted = exercise.sets.every(s => s.completed);
           const logData: any = {
             ...baseLog,
             sets: exercise.sets.length,
+            completed: allSetsCompleted,
+            completed_at: allSetsCompleted ? new Date().toISOString() : null,
           };
           
           if (exercise.metric_reps) {
@@ -294,6 +300,8 @@ const WorkoutSession = () => {
       return {
         ...baseLog,
         sets: 0,
+        completed: false,
+        completed_at: null,
       };
     }).filter(Boolean);
   }, [currentWorkout]);
@@ -506,34 +514,34 @@ const WorkoutSession = () => {
   // Auto status change
   // Auto mark as Done when all sets/time items complete (sets all completed AFTER last action)
   useEffect(()=>{ 
-    if(!currentWorkout || updateSession.isPending) return; 
-    if(totalSets>0 && completedSets===totalSets && currentWorkout.status!=='Done' && !autoMarkedDoneRef.current){ 
+    if(!currentWorkout || completeWorkout.isPending) return; 
+    if(totalSets>0 && completedSets===totalSets && !currentWorkout.completed && !autoMarkedDoneRef.current){ 
       autoMarkedDoneRef.current=true; // flag so we know this was automatic
-      updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Done' } }, { 
+      completeWorkout.mutate({ sessionId: currentWorkout.session_id, completed: true }, { 
         onSuccess:()=>{ 
           confetti({ particleCount:80, spread:55, origin:{y:0.3} }); 
           toast.success('All sets complete. Marked as Done'); 
         } 
       }); 
     } 
-  }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id,updateSession.isPending]);
+  }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending]);
 
   // Only auto-revert to Planned if the status was previously auto-marked Done and user starts undoing sets
   useEffect(()=>{ 
-    if(!currentWorkout || updateSession.isPending) return; 
+    if(!currentWorkout || completeWorkout.isPending) return; 
     if(totalSets===0) return; 
     // Require that the Done status originated from the auto-complete flow
-    if(completedSets < totalSets && currentWorkout.status==='Done' && autoMarkedDoneRef.current){ 
-      updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status:'Planned' } }, { 
+    if(completedSets < totalSets && currentWorkout.completed && autoMarkedDoneRef.current){ 
+      completeWorkout.mutate({ sessionId: currentWorkout.session_id, completed: false }, { 
         onSuccess:()=>toast('Marked as Planned') 
       }); 
       autoMarkedDoneRef.current=false; 
     } 
-  }, [completedSets,totalSets,currentWorkout?.status,currentWorkout?.session_id,updateSession.isPending]);
+  }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending]);
 
   const toggleWorkoutStatus=()=>{ 
     if(!currentWorkout) return; 
-    const markingDone = currentWorkout.status !== 'Done';
+    const markingDone = !currentWorkout.completed;
     
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
@@ -748,8 +756,8 @@ const WorkoutSession = () => {
             )}
           </div>
           {currentWorkout && (
-            <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={completeWorkout.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
-              <CheckSquare className="h-4 w-4" />{currentWorkout.status==='Done'?'Done':'Mark Done'}
+            <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={completeWorkout.isPending} className={currentWorkout.completed?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.completed?'Click to mark as planned':'Click to mark as done'}>
+              <CheckSquare className="h-4 w-4" />{currentWorkout.completed?'Done':'Mark Done'}
             </Button>
           )}
           {/* Save as Template visible only when session Done and exercises exist */}
