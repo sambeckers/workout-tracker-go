@@ -135,7 +135,8 @@ const WorkoutSession = () => {
             metric_time, metric_reps, metric_weight, metric_distance: base?.metric_distance||false,
             durationSeconds: undefined,
             distanceKm: undefined,
-        } as ExerciseWithSets; 
+            targetPace: (log as any).pace || undefined, // RESTORE pace from DB
+        } as ExerciseWithSets;
         if(log.sets){ 
           const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; 
           const weights=log.weight_per_set?log.weight_per_set.split(',').map(w=>parseInt(w)||0):[]; 
@@ -274,6 +275,11 @@ const WorkoutSession = () => {
           if (exercise.metric_distance && exercise.distanceKm) {
             logData.distance_km = exercise.distanceKm;
             logData.distance_unit = exercise.distance_unit || 'km';
+          }
+          
+          // Save pace if set
+          if (exercise.targetPace) {
+            logData.pace = exercise.targetPace;
           }
           
           return logData;

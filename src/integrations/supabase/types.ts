@@ -27,6 +27,7 @@ export type Database = {
           exercise_order: number | null
           log_id: string
           notes: string | null
+          pace: number | null
           reps_per_set: string | null
           session_id: string
           sets: number | null
@@ -45,6 +46,7 @@ export type Database = {
           exercise_order?: number | null
           log_id?: string
           notes?: string | null
+          pace?: number | null
           reps_per_set?: string | null
           session_id: string
           sets?: number | null
@@ -63,6 +65,7 @@ export type Database = {
           exercise_order?: number | null
           log_id?: string
           notes?: string | null
+          pace?: number | null
           reps_per_set?: string | null
           session_id?: string
           sets?: number | null
