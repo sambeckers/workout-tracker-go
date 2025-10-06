@@ -34,7 +34,8 @@ export const useAutoSave = (options: AutoSaveOptions = {}) => {
       return result;
     },
     onSuccess: () => {
-      // Don't invalidate queries during autosave to prevent refetch overwriting local state
+      // Invalidate queries to ensure Schedule and other pages get fresh data
+      queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
       onSuccess?.();
     },
     onError: (error) => {

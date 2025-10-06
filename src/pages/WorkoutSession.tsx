@@ -302,17 +302,32 @@ const WorkoutSession = () => {
   const autoSaveMetadata = useCallback((field: string, value: string) => {
     if (!currentWorkout) return;
     
+    // Don't trim date/time fields, only title and notes
+    const shouldTrim = field === 'title' || field === 'notes';
+    const cleanedValue = shouldTrim ? (value.trim() || null) : (value || null);
+    
     const cleaned = {
-      [field]: value.trim() || null,
+      [field]: cleanedValue,
     };
 
     const oldVal = (currentWorkout as any)[field] ?? null;
     if (cleaned[field] !== oldVal) {
+      // Optimistic update: immediately update the query cache
+      const queryKey = ['workout-sessions', (sessions[0] && sessions[0].user_id)];
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+        return old.map((s: any) => 
+          s.session_id === currentWorkout.session_id 
+            ? { ...s, ...cleaned, updated_at: new Date().toISOString() } 
+            : s
+        );
+      });
+
       markChangesAndAutoSave(() => {
         autoSave.debouncedSaveSession(currentWorkout.session_id, cleaned);
       });
     }
-  }, [currentWorkout, autoSave.debouncedSaveSession, markChangesAndAutoSave]);
+  }, [currentWorkout, autoSave.debouncedSaveSession, markChangesAndAutoSave, sessions, queryClient]);
 
   // Trigger autosave when exercises change
   useEffect(() => {
