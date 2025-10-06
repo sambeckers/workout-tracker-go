@@ -323,11 +323,25 @@ const WorkoutSession = () => {
         );
       });
 
-      markChangesAndAutoSave(() => {
-        autoSave.debouncedSaveSession(currentWorkout.session_id, cleaned);
-      });
+      // Use direct mutation instead of debounced to ensure it saves
+      setHasUnsavedChanges(true);
+      setSaveState('saving');
+      updateSession.mutate(
+        { sessionId: currentWorkout.session_id, data: cleaned },
+        {
+          onSuccess: () => {
+            setSaveState('saved');
+            setHasUnsavedChanges(false);
+            setTimeout(() => setSaveState('idle'), 2000);
+          },
+          onError: () => {
+            setSaveState('idle');
+            toast.error('Failed to save changes');
+          }
+        }
+      );
     }
-  }, [currentWorkout, autoSave.debouncedSaveSession, markChangesAndAutoSave, sessions, queryClient]);
+  }, [currentWorkout, updateSession, sessions, queryClient]);
 
   // Trigger autosave when exercises change
   useEffect(() => {
@@ -513,6 +527,19 @@ const WorkoutSession = () => {
     const next=currentWorkout.status==='Done'?'Planned':'Done';
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
+    
+    // If marking as Done, complete all sets/exercises
+    if(next==='Done'){
+      setExercises(prev=>prev.map(ex=>{
+        if(ex.mode==='time'){
+          return {...ex, timeCompleted:true};
+        } else {
+          return {...ex, sets:ex.sets.map(s=>({...s, completed:true}))};
+        }
+      }));
+      setHasUnsavedChanges(true);
+    }
+    
     updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { 
       onSuccess:()=>{ 
         if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
