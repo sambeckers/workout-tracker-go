@@ -961,29 +961,42 @@ const WorkoutSession = () => {
                       )}
                       {exercise.metric_distance && (
                         <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm shrink-0">Pace [min/km]:</label>
-                            <NumberStepper
-                              value={exercise.targetPace || 5}
-                              onChange={(v) => {
-                                setHasUnsavedChanges(true);
-                                setExercises(p=>p.map(ex=>{
-                                  if(ex.id!==exercise.id) return ex;
-                                  // Auto-calculate time based on distance × pace
-                                  const distance = ex.distanceKm || 0;
-                                  if (distance > 0) {
-                                    const durationMin = distance * v;
-                                    return { ...ex, targetPace: v, durationSeconds: Math.round(durationMin * 60) };
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm shrink-0">Pace [min/km]:</label>
+                              <Input
+                                type="text"
+                                value={(() => {
+                                  const pace = exercise.targetPace || 5;
+                                  const mins = Math.floor(pace);
+                                  const secs = Math.round((pace % 1) * 60);
+                                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                                })()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const match = val.match(/^(\d+):?(\d{0,2})$/);
+                                  if (match) {
+                                    const mins = parseInt(match[1]) || 0;
+                                    const secs = match[2] ? parseInt(match[2]) : 0;
+                                    const decimalPace = mins + (secs / 60);
+                                    setHasUnsavedChanges(true);
+                                    setExercises(p=>p.map(ex=>{
+                                      if(ex.id!==exercise.id) return ex;
+                                      // Auto-calculate time based on distance × pace
+                                      const distance = ex.distanceKm || 0;
+                                      if (distance > 0) {
+                                        const durationMin = distance * decimalPace;
+                                        return { ...ex, targetPace: decimalPace, durationSeconds: Math.round(durationMin * 60) };
+                                      }
+                                      return { ...ex, targetPace: decimalPace };
+                                    }));
                                   }
-                                  return { ...ex, targetPace: v };
-                                }));
-                              }}
-                              min={1}
-                              max={30}
-                              step={0.5}
-                              unit="min/km"
-                              className="flex-1 min-w-[180px]"
-                            />
+                                }}
+                                placeholder="5:30"
+                                className="flex-1 min-w-[180px] font-mono"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Format: MM:SS</p>
                           </div>
                         </div>
                       )}
@@ -1110,29 +1123,42 @@ const WorkoutSession = () => {
                               />
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium w-20">Pace:</label>
-                            <NumberStepper
-                              value={exercise.targetPace || 5}
-                              onChange={(v) => {
-                                setHasUnsavedChanges(true);
-                                setExercises(p=>p.map(ex=>{
-                                  if(ex.id!==exercise.id) return ex;
-                                  // Auto-calculate time based on distance × pace
-                                  const distance = ex.distanceKm || 0;
-                                  if (distance > 0) {
-                                    const durationMin = distance * v;
-                                    return { ...ex, targetPace: v, durationSeconds: Math.round(durationMin * 60) };
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium w-20">Pace:</label>
+                              <Input
+                                type="text"
+                                value={(() => {
+                                  const pace = exercise.targetPace || 5;
+                                  const mins = Math.floor(pace);
+                                  const secs = Math.round((pace % 1) * 60);
+                                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                                })()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const match = val.match(/^(\d+):?(\d{0,2})$/);
+                                  if (match) {
+                                    const mins = parseInt(match[1]) || 0;
+                                    const secs = match[2] ? parseInt(match[2]) : 0;
+                                    const decimalPace = mins + (secs / 60);
+                                    setHasUnsavedChanges(true);
+                                    setExercises(p=>p.map(ex=>{
+                                      if(ex.id!==exercise.id) return ex;
+                                      // Auto-calculate time based on distance × pace
+                                      const distance = ex.distanceKm || 0;
+                                      if (distance > 0) {
+                                        const durationMin = distance * decimalPace;
+                                        return { ...ex, targetPace: decimalPace, durationSeconds: Math.round(durationMin * 60) };
+                                      }
+                                      return { ...ex, targetPace: decimalPace };
+                                    }));
                                   }
-                                  return { ...ex, targetPace: v };
-                                }));
-                              }}
-                              min={1}
-                              max={30}
-                              step={0.5}
-                              unit="min/km"
-                              className="flex-1"
-                            />
+                                }}
+                                placeholder="5:30"
+                                className="flex-1 font-mono"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Format: MM:SS</p>
                           </div>
                         </>
                       )}

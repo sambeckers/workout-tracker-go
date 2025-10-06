@@ -966,22 +966,33 @@ const WorkoutPlanner = () => {
                               {showTime && showDistance && (
                                 <div className="space-y-2">
                                   <Label className="text-sm">Target Pace [min/km]</Label>
-                                  <NumberStepper
-                                    value={exercise.target_pace || 5}
-                                    onChange={(v) => {
-                                      updateExercise(index, 'target_pace', v);
-                                      // Auto-calculate time based on distance × pace
-                                      if (exercise.target_distance_km && exercise.target_distance_km > 0) {
-                                        const durationMin = exercise.target_distance_km * v;
-                                        updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
+                                  <Input
+                                    type="text"
+                                    value={(() => {
+                                      const pace = exercise.target_pace || 5;
+                                      const mins = Math.floor(pace);
+                                      const secs = Math.round((pace % 1) * 60);
+                                      return `${mins}:${secs.toString().padStart(2, '0')}`;
+                                    })()}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const match = val.match(/^(\d+):?(\d{0,2})$/);
+                                      if (match) {
+                                        const mins = parseInt(match[1]) || 0;
+                                        const secs = match[2] ? parseInt(match[2]) : 0;
+                                        const decimalPace = mins + (secs / 60);
+                                        updateExercise(index, 'target_pace', decimalPace);
+                                        // Auto-calculate time based on distance × pace
+                                        if (exercise.target_distance_km && exercise.target_distance_km > 0) {
+                                          const durationMin = exercise.target_distance_km * decimalPace;
+                                          updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
+                                        }
                                       }
                                     }}
-                                    min={1}
-                                    max={30}
-                                    step={0.5}
-                                    buttonStep={1}
-                                    unit="min/km"
+                                    placeholder="5:30"
+                                    className="font-mono"
                                   />
+                                  <p className="text-xs text-muted-foreground">Format: MM:SS (e.g., 5:30)</p>
                                 </div>
                               )}
                               {showTime && (
