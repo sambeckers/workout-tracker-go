@@ -211,7 +211,7 @@ export const useExerciseLogs = (sessionId?: string) => {
           exercise:exercises(*)
         `)
         .eq('session_id', sessionId)
-        .order('created_at');
+        .order('exercise_order', { ascending: true });
       
       if (error) throw error;
       return data as ExerciseLog[];
@@ -543,7 +543,8 @@ export const useProgressData = () => {
         `)
         .eq('session.user_id', user.id)
         .eq('session.status', 'Done')
-        .is('session.deleted_at', null);
+        .is('session.deleted_at', null)
+        .order('session.date', { ascending: true });
       
       if (logsError) throw logsError;
       
