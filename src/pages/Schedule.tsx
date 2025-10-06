@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, Users, Target, Play, Edit, Trash2, Plus, Download, Dumbbell, CheckSquare, Search } from 'lucide-react';
-import { useWorkoutSessions, useCreateWorkoutSession, useUpdateWorkoutSession, useDeleteWorkoutSession, useExportWorkoutData, useExercises, useBulkCreateExerciseLogs } from '@/hooks/useWorkoutData';
+import { useWorkoutSessions, useCreateWorkoutSession, useUpdateWorkoutSession, useDeleteWorkoutSession, useExportWorkoutData, useExercises, useBulkCreateExerciseLogs, useCompleteWorkoutSession } from '@/hooks/useWorkoutData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -25,6 +25,7 @@ const Schedule = () => {
   const exportDataMutation = useExportWorkoutData();
   const { data: exercises = [], isLoading: exercisesLoading } = useExercises();
   const bulkCreateLogs = useBulkCreateExerciseLogs();
+  const completeWorkout = useCompleteWorkoutSession();
 
   const [showExerciseDialog, setShowExerciseDialog] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
@@ -117,13 +118,12 @@ const Schedule = () => {
     if (updatingSessionId) return; // Prevent multiple simultaneous updates
     
     const markingDone = currentStatus !== 'Done';
-    const newStatus = markingDone ? 'Done' : 'Planned';
     
     setUpdatingSessionId(sessionId);
     
-    updateWorkoutMutation.mutate({
+    completeWorkout.mutate({
       sessionId,
-      data: { status: newStatus }
+      completed: markingDone
     }, {
       onSuccess: () => {
         setUpdatingSessionId(null);

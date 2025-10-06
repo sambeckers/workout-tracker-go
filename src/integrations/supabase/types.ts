@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       exercise_logs: {
         Row: {
+          completed: boolean | null
+          completed_at: string | null
           created_at: string
           distance_km: number | null
           distance_unit: string | null
@@ -32,6 +34,8 @@ export type Database = {
           weight_per_set: string | null
         }
         Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           distance_km?: number | null
           distance_unit?: string | null
@@ -48,6 +52,8 @@ export type Database = {
           weight_per_set?: string | null
         }
         Update: {
+          completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           distance_km?: number | null
           distance_unit?: string | null
@@ -238,6 +244,8 @@ export type Database = {
       }
       workout_sessions: {
         Row: {
+          completed: boolean | null
+          completed_at: string | null
           created_at: string
           date: string
           deleted_at: string | null
@@ -251,6 +259,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           date: string
           deleted_at?: string | null
@@ -264,6 +274,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          completed?: boolean | null
+          completed_at?: string | null
           created_at?: string
           date?: string
           deleted_at?: string | null

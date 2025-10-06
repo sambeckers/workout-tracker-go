@@ -14,7 +14,7 @@ import NumberStepper from '@/components/ui/number-stepper';
 import { UnitToggle } from '@/components/ui/unit-toggle';
 import { toast } from 'sonner';
 import { useUnitPreference } from '@/contexts/UnitPreferenceContext';
-import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession, useWorkoutTemplates, useCreateWorkoutTemplate, useRegisterTemplateUse, scoreTemplates } from '@/hooks/useWorkoutData';
+import { useWorkoutSessions, useExercises, useExerciseLogs, useCreateExerciseLog, useCreateWorkoutSession, useUpdateWorkoutSession, useWorkoutTemplates, useCreateWorkoutTemplate, useRegisterTemplateUse, scoreTemplates, useCompleteWorkoutSession } from '@/hooks/useWorkoutData';
 import { generateTemplateName } from '@/utils/templateNaming';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAutoSave } from '@/hooks/useAutoSave';
@@ -63,6 +63,7 @@ const WorkoutSession = () => {
   const createExerciseLog = useCreateExerciseLog();
   const createSession = useCreateWorkoutSession();
   const updateSession = useUpdateWorkoutSession();
+  const completeWorkout = useCompleteWorkoutSession();
   const createTemplate = useCreateWorkoutTemplate();
   const registerTemplateUse = useRegisterTemplateUse();
   const queryClient = useQueryClient();
@@ -532,13 +533,26 @@ const WorkoutSession = () => {
 
   const toggleWorkoutStatus=()=>{ 
     if(!currentWorkout) return; 
-    const next=currentWorkout.status==='Done'?'Planned':'Done';
+    const markingDone = currentWorkout.status !== 'Done';
+    
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
     
-    // Calculate new exercises state with all completed/uncompleted
+    // Optimistic update: immediately update UI
+    const queryKey = ['workout-sessions', currentWorkout.user_id];
+    const previous = queryClient.getQueryData<any>(queryKey);
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old;
+      return old.map((s: any) => 
+        s.session_id === currentWorkout.session_id 
+          ? { ...s, status: markingDone ? 'Done' : 'Planned', completed: markingDone, updated_at: new Date().toISOString() } 
+          : s
+      );
+    });
+    
+    // Also update local exercises state optimistically
     const updatedExercises = exercises.map(ex=>{
-      if(next==='Done'){
+      if(markingDone){
         // Mark all as completed
         if(ex.mode==='time'){
           return {...ex, timeCompleted:true};
@@ -554,40 +568,30 @@ const WorkoutSession = () => {
         }
       }
     });
-    
-    // Immediately save exercise logs with the new state (not debounced)
-    const logs = buildExerciseLogs(updatedExercises);
-    if (logs.length > 0) {
-      autoSave.saveExerciseLogsImmediately(logs);
-    }
-    
-    // Update local state
     setExercises(updatedExercises);
-    setHasUnsavedChanges(true);
     
-    // Optimistic update: immediately update the query cache
-    const queryKey = ['workout-sessions', currentWorkout.user_id];
-    const previous = queryClient.getQueryData<any>(queryKey);
-    queryClient.setQueryData(queryKey, (old: any) => {
-      if (!old) return old;
-      return old.map((s: any) => 
-        s.session_id === currentWorkout.session_id 
-          ? { ...s, status: next, updated_at: new Date().toISOString() } 
-          : s
-      );
-    });
-    
-    updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { 
-      onSuccess:()=>{ 
-        if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
+    // Call the atomic completion API
+    completeWorkout.mutate({ 
+      sessionId: currentWorkout.session_id, 
+      completed: markingDone 
+    }, { 
+      onSuccess:(data)=>{ 
+        if(markingDone) confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
         setSaveState('saved');
         setHasUnsavedChanges(false);
         setTimeout(() => setSaveState('idle'), 2000);
+        
+        // Update exercises from response to ensure sync
+        if (data.exercise_logs) {
+          toast('Workout ' + (markingDone ? 'completed!' : 'reverted to planned'));
+        }
       },
       onError:(err)=>{
         // Rollback on error
         queryClient.setQueryData(queryKey, previous);
-        console.error('Failed to update workout status', err);
+        setExercises(exercises); // Revert to original
+        toast.error('Failed to update workout status');
+        console.error('Failed to complete workout', err);
       }
     }); 
   };
@@ -744,7 +748,7 @@ const WorkoutSession = () => {
             )}
           </div>
           {currentWorkout && (
-            <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={updateSession.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
+            <Button variant="outline" size="sm" onClick={toggleWorkoutStatus} disabled={completeWorkout.isPending} className={currentWorkout.status==='Done'?'border-green-500 text-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-950/20':'flex items-center gap-2'} title={currentWorkout.status==='Done'?'Click to mark as planned':'Click to mark as done'}>
               <CheckSquare className="h-4 w-4" />{currentWorkout.status==='Done'?'Done':'Mark Done'}
             </Button>
           )}

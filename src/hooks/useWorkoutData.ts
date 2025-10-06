@@ -778,6 +778,50 @@ export const scoreTemplates = (templates: WorkoutTemplate[]): { template: Workou
   }).sort((a,b)=>b.score-a.score);
 };
 
+// Complete workout session (atomically marks session and all exercises as completed)
+export const useCompleteWorkoutSession = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sessionId, completed }: { sessionId: string; completed: boolean }) => {
+      const { data, error } = await supabase.functions.invoke(
+        `complete-workout-session/${sessionId}/complete`,
+        {
+          body: { completed },
+        }
+      );
+
+      if (error) {
+        console.error('Complete workout error:', error);
+        throw new Error(error.message || 'Failed to update workout completion');
+      }
+
+      if (!data || !data.success) {
+        throw new Error('Failed to update workout completion');
+      }
+
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate all related queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['workout-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-logs', variables.sessionId] });
+      
+      // Optionally update cache directly for immediate UI update
+      const session = data.session;
+      if (session) {
+        queryClient.setQueryData(['workout-sessions', session.user_id], (old: WorkoutSession[] | undefined) => {
+          if (!old) return old;
+          return old.map(s => s.session_id === session.session_id ? session : s);
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to complete workout:', error);
+    },
+  });
+};
+
 export const useExportWorkoutData = () => {
   const { user } = useAuth();
   
