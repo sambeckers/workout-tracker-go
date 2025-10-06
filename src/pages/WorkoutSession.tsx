@@ -93,6 +93,7 @@ const WorkoutSession = () => {
   const [favoriteExercises,setFavoriteExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('favorite-exercises')||'[]'); } catch { return []; } });
   const [recentExercises,setRecentExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('recent-exercises')||'[]'); } catch { return []; } });
   const autoMarkedDoneRef = useRef(false);
+  const previouslyAllCompleteRef = useRef(false); // Track previous completion state to detect transitions
   // Template modals state
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
@@ -130,7 +131,7 @@ const WorkoutSession = () => {
             mode: (log.duration_seconds && log.sets===null) || metric_time ? 'time':'sets', 
             enableReps: metric_reps, 
             enableWeight: metric_weight, 
-            timeCompleted:false,
+            timeCompleted: log.completed || false, // RESTORE completion state from DB
             metric_time, metric_reps, metric_weight, metric_distance: base?.metric_distance||false,
             durationSeconds: undefined,
             distanceKm: undefined,
@@ -138,8 +139,9 @@ const WorkoutSession = () => {
         if(log.sets){ 
           const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; 
           const weights=log.weight_per_set?log.weight_per_set.split(',').map(w=>parseInt(w)||0):[]; 
+          const logCompleted = log.completed || false; // Get completion state from DB
           for(let i=0;i<log.sets;i++){ 
-            acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed:false }); 
+            acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed: logCompleted }); // Restore per-set completion
           } 
         } else if (log.duration_seconds) {
           // Time-based planned/logged exercise
@@ -220,6 +222,9 @@ const WorkoutSession = () => {
       setExercises([{ id:'temp-1', name:'Push-ups', sets:DEFAULT_SETS.map(s=>({...s})), mode:'sets', advanced:false, enableReps:true, enableWeight:true, timeCompleted:false }]);
     }
   }, [exerciseLogs,availableExercises,id,searchParams]);
+
+  // REMOVED: Problematic effect that caused infinite loops
+  // Completion state is now properly loaded from exercise logs and persisted via autosave
 
   // Auto create session when /new
   const createSessionIfNeeded = async ()=>{ if(id!=='new') return; if(createSession.isPending) return; try { const now=new Date(); const date=now.toISOString().slice(0,10); const time=now.toTimeString().slice(0,5); const session=await createSession.mutateAsync({ date,time,status:'Planned' }); navigate(`/workout/${session.session_id}`); } catch { toast.error('Failed to create session'); } };
@@ -369,7 +374,13 @@ const WorkoutSession = () => {
 
   // Timer
   useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>{setDuration(d=>d+1); setHasUnsavedChanges(true);},1000); return ()=>clearInterval(int); }, [isActive]);
-  const toggleSet=(eid:string,idx:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,completed:!s.completed}:s)}:ex));};
+  const toggleSet=(eid:string,idx:number)=>{
+    setHasUnsavedChanges(true);
+    setExercises(prev=>prev.map(ex=>{
+      if(ex.id!==eid) return ex;
+      return { ...ex, sets: ex.sets.map((s,i)=> i===idx ? { ...s, completed: !s.completed } : s) };
+    }));
+  };
   const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));};
   const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
     if(ex.id!==eid) return ex; 
@@ -405,7 +416,16 @@ const WorkoutSession = () => {
   const setTimeCompleted=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,timeCompleted:done}:ex));};
   const toggleAdvanced=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?(()=>{ const adv=!ex.advanced; localStorage.setItem(`exercise-mode-${ex.id}`, adv?'advanced':'compact'); return {...ex,advanced:adv}; })():ex));};
   const updateAllSets=(eid:string,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,[field]:val}))}:ex));};
-  const setAllSetsCompletion=(eid:string,done:boolean)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map(s=>({...s,completed:done}))}:ex));};
+  const setAllSetsCompletion=(eid:string,done:boolean)=>{
+    setHasUnsavedChanges(true);
+    setExercises(prev=>prev.map(ex=>{
+      if(ex.id!==eid) return ex;
+      if((ex.mode||'sets')==='time'){
+        return { ...ex, timeCompleted: done };
+      }
+      return { ...ex, sets: ex.sets.map(s=>({ ...s, completed: done })) };
+    }));
+  };
 
   // Delete exercise with autosave
   const deleteExercise = (exerciseId: string) => {
@@ -512,32 +532,32 @@ const WorkoutSession = () => {
   const totalSets = exercises.reduce((t,ex)=>(ex.mode||'sets')==='time'?t+1:t+ex.sets.length,0);
 
   // Auto status change
-  // Auto mark as Done when all sets/time items complete (sets all completed AFTER last action)
+  // Auto mark as Done when all sets/time items complete (only on TRANSITION from incomplete to complete)
   useEffect(()=>{ 
     if(!currentWorkout || completeWorkout.isPending) return; 
-    if(totalSets>0 && completedSets===totalSets && !currentWorkout.completed && !autoMarkedDoneRef.current){ 
-      autoMarkedDoneRef.current=true; // flag so we know this was automatic
+    
+    const allComplete = totalSets > 0 && completedSets === totalSets;
+    
+    // Only auto-mark if:
+    // 1. All exercises just became complete (transition detected)
+    // 2. Workout is not already marked as done
+    // 3. We haven't already auto-marked this session
+    if(allComplete && !previouslyAllCompleteRef.current && !currentWorkout.completed && !autoMarkedDoneRef.current){ 
+      autoMarkedDoneRef.current = true; // flag so we know this was automatic
       completeWorkout.mutate({ sessionId: currentWorkout.session_id, completed: true }, { 
         onSuccess:()=>{ 
           confetti({ particleCount:80, spread:55, origin:{y:0.3} }); 
           toast.success('All sets complete. Marked as Done'); 
         } 
       }); 
-    } 
+    }
+    
+    // Update the tracking ref for next render
+    previouslyAllCompleteRef.current = allComplete;
   }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending]);
 
-  // Only auto-revert to Planned if the status was previously auto-marked Done and user starts undoing sets
-  useEffect(()=>{ 
-    if(!currentWorkout || completeWorkout.isPending) return; 
-    if(totalSets===0) return; 
-    // Require that the Done status originated from the auto-complete flow
-    if(completedSets < totalSets && currentWorkout.completed && autoMarkedDoneRef.current){ 
-      completeWorkout.mutate({ sessionId: currentWorkout.session_id, completed: false }, { 
-        onSuccess:()=>toast('Marked as Planned') 
-      }); 
-      autoMarkedDoneRef.current=false; 
-    } 
-  }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending]);
+  // REMOVED: Auto-revert effects that caused loops
+  // User has full manual control; completion state persists via autosave
 
   const toggleWorkoutStatus=()=>{ 
     if(!currentWorkout) return; 
@@ -577,6 +597,7 @@ const WorkoutSession = () => {
       }
     });
     setExercises(updatedExercises);
+    setHasUnsavedChanges(true); // ensure autosave picks up completed sets/logs
     
     // Call the atomic completion API
     completeWorkout.mutate({ 
