@@ -12,8 +12,8 @@ export interface WorkoutSession {
   status: 'Planned' | 'Done' | 'Skipped';
   notes?: string;
   duration_minutes?: number;
-  completed?: boolean | null;
-  completed_at?: string | null;
+  completed?: boolean;
+  completed_at?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -47,8 +47,8 @@ export interface ExerciseLog {
   duration_seconds?: number;
   distance_km?: number;
   notes?: string;
-  completed?: boolean | null;
-  completed_at?: string | null;
+  completed?: boolean;
+  completed_at?: string;
   created_at: string;
   updated_at: string;
   exercise?: Exercise;
