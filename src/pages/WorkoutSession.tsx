@@ -109,6 +109,9 @@ const WorkoutSession = () => {
   const [metaDraft,setMetaDraft] = useState({ title: currentWorkout?.title||'', date: currentWorkout?.date||'', time: currentWorkout?.time||'', notes:(currentWorkout as any)?.notes||'' });
   useEffect(()=>{ if(currentWorkout){ setMetaDraft({ title: currentWorkout.title||'', date: currentWorkout.date||'', time: currentWorkout.time||'', notes:(currentWorkout as any)?.notes||'' }); } }, [currentWorkout?.title,currentWorkout?.date,currentWorkout?.time,(currentWorkout as any)?.notes]);
 
+  // Pace input state (for controlled input during typing)
+  const [paceInputs, setPaceInputs] = useState<Record<string, string>>({});
+
   // Build exercises list (logs -> planned -> new defaults)
   useEffect(()=>{
     if(exerciseLogs.length){
@@ -552,10 +555,27 @@ const WorkoutSession = () => {
       setHasUnsavedChanges(true);
     }
     
+    // Optimistic update: immediately update the query cache
+    const queryKey = ['workout-sessions', currentWorkout.user_id];
+    const previous = queryClient.getQueryData<any>(queryKey);
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old;
+      return old.map((s: any) => 
+        s.session_id === currentWorkout.session_id 
+          ? { ...s, status: next, updated_at: new Date().toISOString() } 
+          : s
+      );
+    });
+    
     updateSession.mutate({ sessionId: currentWorkout.session_id, data:{ status: next } }, { 
       onSuccess:()=>{ 
         if(next==='Done') confetti({ particleCount:60, spread:45, origin:{y:0.3} }); 
-      } 
+      },
+      onError:(err)=>{
+        // Rollback on error
+        queryClient.setQueryData(queryKey, previous);
+        console.error('Failed to update workout status', err);
+      }
     }); 
   };
 
@@ -966,7 +986,7 @@ const WorkoutSession = () => {
                               <label className="text-sm shrink-0">Pace [min/km]:</label>
                               <Input
                                 type="text"
-                                value={(() => {
+                                value={paceInputs[exercise.id] !== undefined ? paceInputs[exercise.id] : (() => {
                                   const pace = exercise.targetPace || 5;
                                   const mins = Math.floor(pace);
                                   const secs = Math.round((pace % 1) * 60);
@@ -974,6 +994,10 @@ const WorkoutSession = () => {
                                 })()}
                                 onChange={(e) => {
                                   const val = e.target.value;
+                                  // Update local input state to allow typing
+                                  setPaceInputs(prev => ({ ...prev, [exercise.id]: val }));
+                                  
+                                  // Try to parse and update exercise state if valid
                                   const match = val.match(/^(\d+):?(\d{0,2})$/);
                                   if (match) {
                                     const mins = parseInt(match[1]) || 0;
@@ -991,6 +1015,14 @@ const WorkoutSession = () => {
                                       return { ...ex, targetPace: decimalPace };
                                     }));
                                   }
+                                }}
+                                onBlur={() => {
+                                  // Clear local input state on blur, reverting to calculated display
+                                  setPaceInputs(prev => {
+                                    const next = { ...prev };
+                                    delete next[exercise.id];
+                                    return next;
+                                  });
                                 }}
                                 placeholder="5:30"
                                 className="flex-1 min-w-[180px] font-mono"
@@ -1128,7 +1160,7 @@ const WorkoutSession = () => {
                               <label className="text-sm font-medium w-20">Pace:</label>
                               <Input
                                 type="text"
-                                value={(() => {
+                                value={paceInputs[exercise.id] !== undefined ? paceInputs[exercise.id] : (() => {
                                   const pace = exercise.targetPace || 5;
                                   const mins = Math.floor(pace);
                                   const secs = Math.round((pace % 1) * 60);
@@ -1136,6 +1168,10 @@ const WorkoutSession = () => {
                                 })()}
                                 onChange={(e) => {
                                   const val = e.target.value;
+                                  // Update local input state to allow typing
+                                  setPaceInputs(prev => ({ ...prev, [exercise.id]: val }));
+                                  
+                                  // Try to parse and update exercise state if valid
                                   const match = val.match(/^(\d+):?(\d{0,2})$/);
                                   if (match) {
                                     const mins = parseInt(match[1]) || 0;
@@ -1153,6 +1189,14 @@ const WorkoutSession = () => {
                                       return { ...ex, targetPace: decimalPace };
                                     }));
                                   }
+                                }}
+                                onBlur={() => {
+                                  // Clear local input state on blur, reverting to calculated display
+                                  setPaceInputs(prev => {
+                                    const next = { ...prev };
+                                    delete next[exercise.id];
+                                    return next;
+                                  });
                                 }}
                                 placeholder="5:30"
                                 className="flex-1 font-mono"
