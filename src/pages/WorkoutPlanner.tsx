@@ -986,8 +986,11 @@ const WorkoutPlanner = () => {
                                        value={getDisplayDistance(exercise)}
                                         onChange={(v) => {
                                           setDisplayDistance(index, v);
-                                          // Auto-calculate pace if time is set (convert seconds to minutes)
-                                          if (exercise.target_duration_sec && v > 0) {
+                                          // Auto-calculate time if pace is set, OR auto-calculate pace if time is set
+                                          if (exercise.target_pace && v > 0) {
+                                            const durationMin = v * exercise.target_pace;
+                                            updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
+                                          } else if (exercise.target_duration_sec && v > 0) {
                                             const durationMin = exercise.target_duration_sec / 60;
                                             const pace = durationMin / v;
                                             updateExercise(index, 'target_pace', pace);
@@ -1064,14 +1067,18 @@ const WorkoutPlanner = () => {
                                   <div className="flex flex-col gap-2">
                                      <NumberStepper
                                        value={getDisplayDuration(exercise)}
-                                       onChange={(v) => {
-                                         setDisplayDuration(index, v);
-                                         // Auto-calculate pace if distance is set
-                                         if (exercise.target_distance_km && exercise.target_distance_km > 0) {
-                                           const pace = v / exercise.target_distance_km;
-                                           updateExercise(index, 'target_pace', pace);
-                                         }
-                                       }}
+                                        onChange={(v) => {
+                                          setDisplayDuration(index, v);
+                                          // Auto-calculate pace if distance is set (convert display value to minutes first)
+                                          if (exercise.target_distance_km && exercise.target_distance_km > 0) {
+                                            let seconds = v;
+                                            if(exercise.duration_unit === 'min') seconds = v * 60;
+                                            else if(exercise.duration_unit === 'hr') seconds = v * 3600;
+                                            const durationMin = seconds / 60;
+                                            const pace = durationMin / exercise.target_distance_km;
+                                            updateExercise(index, 'target_pace', pace);
+                                          }
+                                        }}
                                        min={1}
                                        max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
                                        step={exercise.duration_unit === 'hr' ? 0.25 : exercise.duration_unit === 'min' ? 0.5 : 5}
