@@ -984,15 +984,15 @@ const WorkoutPlanner = () => {
                                   <div className="flex flex-col gap-2">
                                      <NumberStepper
                                        value={getDisplayDistance(exercise)}
-                                       onChange={(v) => {
-                                         setDisplayDistance(index, v);
-                                         // Auto-calculate pace if time is set
-                                         if (exercise.target_duration_sec && v > 0) {
-                                           const durationMin = exercise.target_duration_sec;
-                                           const pace = durationMin / v;
-                                           updateExercise(index, 'target_pace', pace);
-                                         }
-                                       }}
+                                        onChange={(v) => {
+                                          setDisplayDistance(index, v);
+                                          // Auto-calculate pace if time is set (convert seconds to minutes)
+                                          if (exercise.target_duration_sec && v > 0) {
+                                            const durationMin = exercise.target_duration_sec / 60;
+                                            const pace = durationMin / v;
+                                            updateExercise(index, 'target_pace', pace);
+                                          }
+                                        }}
                                        min={0}
                                        max={exercise.distance_unit === 'm' ? 100000 : 200}
                                        step={exercise.distance_unit === 'm' ? 10 : 0.5}

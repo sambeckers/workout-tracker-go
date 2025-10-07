@@ -167,12 +167,10 @@ const WorkoutSession = () => {
           // Determine mode and initial duration/distance
           let durationSeconds: number | undefined = undefined;
           if(metric_time){
-            // Preserve original entered value – store canonical seconds but keep unit info so UI can reconstruct
+            // target_duration_sec from planner is already in canonical seconds (not display value)
             const rawDur = ex.target_duration_sec || 0;
             if(rawDur>0){
-              if(ex.duration_unit==='hr') durationSeconds = rawDur * 3600; 
-              else if(ex.duration_unit==='min') durationSeconds = rawDur * 60; 
-              else durationSeconds = rawDur; 
+              durationSeconds = rawDur; // Already in seconds, no conversion needed
             } else {
               durationSeconds = 60; // default
             }
