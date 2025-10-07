@@ -420,13 +420,6 @@ const WorkoutPlanner = () => {
       if(i !== index) return ex;
       let km = value;
       if(ex.distance_unit === 'm') km = value / 1000;
-      
-      // Auto-calculate time if pace is set
-      if (ex.target_pace && km > 0) {
-        const durationMin = km * ex.target_pace;
-        return { ...ex, target_distance_km: km, target_duration_sec: Math.round(durationMin * 60) };
-      }
-      
       return { ...ex, target_distance_km: km };
     }));
   };
@@ -987,14 +980,20 @@ const WorkoutPlanner = () => {
                                         onChange={(v) => {
                                           setDisplayDistance(index, v);
                                           // Auto-calculate time if pace is set, OR auto-calculate pace if time is set
-                                          if (exercise.target_pace && v > 0) {
-                                            const durationMin = v * exercise.target_pace;
-                                            updateExercise(index, 'target_duration_sec', Math.round(durationMin * 60));
-                                          } else if (exercise.target_duration_sec && v > 0) {
-                                            const durationMin = exercise.target_duration_sec / 60;
-                                            const pace = durationMin / v;
-                                            updateExercise(index, 'target_pace', pace);
-                                          }
+                                          setSelectedExercises(prev => prev.map((ex, i) => {
+                                            if(i !== index) return ex;
+                                            let km = v;
+                                            if(ex.distance_unit === 'm') km = v / 1000;
+                                            if (ex.target_pace && km > 0) {
+                                              const durationMin = km * ex.target_pace;
+                                              return { ...ex, target_duration_sec: Math.round(durationMin * 60) };
+                                            } else if (ex.target_duration_sec && km > 0) {
+                                              const durationMin = ex.target_duration_sec / 60;
+                                              const pace = durationMin / km;
+                                              return { ...ex, target_pace: pace };
+                                            }
+                                            return ex;
+                                          }));
                                         }}
                                        min={0}
                                        max={exercise.distance_unit === 'm' ? 100000 : 200}
@@ -1069,15 +1068,19 @@ const WorkoutPlanner = () => {
                                        value={getDisplayDuration(exercise)}
                                         onChange={(v) => {
                                           setDisplayDuration(index, v);
-                                          // Auto-calculate pace if distance is set (convert display value to minutes first)
-                                          if (exercise.target_distance_km && exercise.target_distance_km > 0) {
-                                            let seconds = v;
-                                            if(exercise.duration_unit === 'min') seconds = v * 60;
-                                            else if(exercise.duration_unit === 'hr') seconds = v * 3600;
-                                            const durationMin = seconds / 60;
-                                            const pace = durationMin / exercise.target_distance_km;
-                                            updateExercise(index, 'target_pace', pace);
-                                          }
+                                          // Auto-calculate pace if distance is set
+                                          setSelectedExercises(prev => prev.map((ex, i) => {
+                                            if(i !== index) return ex;
+                                            if (ex.target_distance_km && ex.target_distance_km > 0) {
+                                              let seconds = v;
+                                              if(ex.duration_unit === 'min') seconds = v * 60;
+                                              else if(ex.duration_unit === 'hr') seconds = v * 3600;
+                                              const durationMin = seconds / 60;
+                                              const pace = durationMin / ex.target_distance_km;
+                                              return { ...ex, target_pace: pace };
+                                            }
+                                            return ex;
+                                          }));
                                         }}
                                        min={1}
                                        max={exercise.duration_unit === 'hr' ? 24 : exercise.duration_unit === 'min' ? 120 : 3600}
