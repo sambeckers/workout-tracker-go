@@ -1090,7 +1090,7 @@ const WorkoutSession = () => {
                       <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[220px]">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
-                            <label className="text-sm shrink-0">Time:</label>
+                            <label className="text-sm shrink-0">Duration:</label>
                             <NumberStepper
                               value={getDisplayDuration(exercise)}
                               onChange={(v) => {

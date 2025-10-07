@@ -438,10 +438,11 @@ const WorkoutPlanner = () => {
     setSelectedExercises(prev => prev.map((ex, i) => {
       if(i !== index) return ex;
       const unit = ex.duration_unit;
-      let secs = Math.max(0, value);
+      let secs = 0;
       if(unit === 'min') secs = value * 60;
       else if(unit === 'hr') secs = value * 3600;
-      return { ...ex, target_duration_sec: Math.round(secs) };
+      else secs = value; // sec
+      return { ...ex, target_duration_sec: Math.round(Math.max(0, secs)) };
     }));
   };
 
@@ -533,11 +534,8 @@ const WorkoutPlanner = () => {
             const metric_distance = exerciseData?.metric_distance || false;
 
             if(metric_time){
-              // Store as canonical seconds in database
-              let seconds = ex.target_duration_sec || 60;
-              if(ex.duration_unit==='min') seconds = seconds * 60;
-              else if(ex.duration_unit==='hr') seconds = seconds * 3600;
-              base.duration_seconds = seconds;
+              // target_duration_sec is already in canonical seconds
+              base.duration_seconds = ex.target_duration_sec || 60;
               base.duration_unit = ex.duration_unit || 'min'; // Save the unit preference
               
               if(metric_distance && (ex.target_distance_km!=null && ex.target_distance_km > 0)){
