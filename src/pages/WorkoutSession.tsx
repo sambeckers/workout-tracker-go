@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -1130,15 +1131,35 @@ const WorkoutSession = () => {
                               ) : <Badge variant="outline">{exercise.sets.filter(s=>s.completed).length}/{exercise.sets.length} sets</Badge>}
                               <Button variant="ghost" size="sm" onClick={()=>toggleAdvanced(exercise.id)}>{exercise.advanced?'Compact':'Advanced'}</Button>
                               <Button variant="ghost" size="sm" onClick={()=>toggleMode(exercise.id)}>{(exercise.mode||'sets')==='time'?'Use Sets':'Use Time'}</Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => deleteExercise(exercise.id)}
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                title="Delete exercise"
-                              >
-                                <XIcon className="h-4 w-4" />
-                              </Button>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    title="Delete exercise"
+                                  >
+                                    <XIcon className="h-4 w-4" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-3" align="end">
+                                  <div className="space-y-3">
+                                    <p className="text-sm font-medium">Delete this exercise?</p>
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
+                                        Cancel
+                                      </Button>
+                                      <Button 
+                                        variant="destructive" 
+                                        size="sm" 
+                                        onClick={() => deleteExercise(exercise.id)}
+                                      >
+                                        Delete
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           </CardTitle>
                         </CardHeader>
