@@ -94,6 +94,60 @@ const WorkoutSession = () => {
   const [recentExercises,setRecentExercises] = useState<string[]>(()=>{ try { return JSON.parse(localStorage.getItem('recent-exercises')||'[]'); } catch { return []; } });
   const autoMarkedDoneRef = useRef(false);
   const previouslyAllCompleteRef = useRef(false); // Track previous completion state to detect transitions
+  // Timer refs for background operation
+  const startTimeRef = useRef<number | null>(null); // Timestamp when timer started
+  const elapsedBeforePauseRef = useRef<number>(0); // Accumulated time before current pause
+  
+  // Restore timer state from localStorage on mount
+  useEffect(() => {
+    if (!id || id === 'new' || id === 'quick') return;
+    const timerKey = `workout-timer-${id}`;
+    try {
+      const saved = localStorage.getItem(timerKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.isActive) {
+          startTimeRef.current = parsed.startTime;
+          elapsedBeforePauseRef.current = parsed.elapsedBeforePause || 0;
+          setIsActive(true);
+          // Recalculate duration immediately
+          const now = Date.now();
+          const currentElapsed = Math.floor((now - parsed.startTime) / 1000);
+          setDuration(parsed.elapsedBeforePause + currentElapsed);
+        } else if (parsed.duration) {
+          setDuration(parsed.duration);
+          elapsedBeforePauseRef.current = parsed.duration;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore timer state:', e);
+    }
+  }, [id]);
+  
+  // Save timer state to localStorage whenever it changes
+  useEffect(() => {
+    if (!id || id === 'new' || id === 'quick') return;
+    const timerKey = `workout-timer-${id}`;
+    const timerState = {
+      sessionId: id,
+      isActive,
+      startTime: startTimeRef.current,
+      elapsedBeforePause: elapsedBeforePauseRef.current,
+      duration,
+      lastUpdated: Date.now(),
+    };
+    localStorage.setItem(timerKey, JSON.stringify(timerState));
+    
+    // Also save to global active workout tracker
+    if (isActive) {
+      localStorage.setItem('active-workout-session', id);
+    } else {
+      const activeSession = localStorage.getItem('active-workout-session');
+      if (activeSession === id) {
+        localStorage.removeItem('active-workout-session');
+      }
+    }
+  }, [id, isActive, duration]);
   // Template modals state
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
@@ -117,6 +171,7 @@ const WorkoutSession = () => {
   // Build exercises list (logs -> planned -> new defaults)
   useEffect(()=>{
     if(exerciseLogs.length){
+      console.log('[WorkoutSession] Loading exercise logs:', exerciseLogs);
       const groups = exerciseLogs.reduce((acc,log)=>{ 
         const eid=log.exercise_id; 
         const base = availableExercises.find(e=>e.exercise_id===eid) as any;
@@ -136,16 +191,33 @@ const WorkoutSession = () => {
             durationSeconds: undefined,
             distanceKm: undefined,
             targetPace: (log as any).pace || undefined, // RESTORE pace from DB
+            duration_unit: ((log as any).duration_unit as 'sec'|'min'|'hr') || 'min', // RESTORE duration unit
+            distance_unit: ((log as any).distance_unit as 'm'|'km') || 'km', // RESTORE distance unit
         } as ExerciseWithSets;
         if(log.sets){ 
           const reps=log.reps_per_set?log.reps_per_set.split(',').map(r=>parseInt(r)||0):[]; 
           const weights=log.weight_per_set?log.weight_per_set.split(',').map(w=>parseInt(w)||0):[]; 
-          const logCompleted = log.completed || false; // Get completion state from DB
+          const logCompleted = log.completed || false; // Overall exercise completion
+          
+          // Check for per-set completion data (try completed_sets column first, then notes field workaround)
+          let completedSets: boolean[] = [];
+          const completedSetsStr = (log as any).completed_sets;
+          if (completedSetsStr && completedSetsStr.length > 0) {
+            // New column exists
+            completedSets = completedSetsStr.split(',').map((c:string)=>parseInt(c)===1);
+          } else if (log.notes && log.notes.startsWith('__COMPLETION__:')) {
+            // Workaround: decode from notes field
+            const encoded = log.notes.replace('__COMPLETION__:', '');
+            completedSets = encoded.split(',').map((c:string)=>parseInt(c)===1);
+          }
+          
           for(let i=0;i<log.sets;i++){ 
-            acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed: logCompleted }); // Restore per-set completion
+            // If per-set data exists, use it; otherwise use overall completion for backwards compatibility
+            const setCompleted = completedSets.length > 0 ? (completedSets[i] || false) : logCompleted;
+            acc[eid].sets.push({ setNumber:i+1, reps: reps[i]||0, weight: weights[i]||0, completed: setCompleted }); 
           } 
         } else if (log.duration_seconds) {
-          // Time-based planned/logged exercise
+          // Time-based planned/logged exercise - RESTORE all fields
           acc[eid].durationSeconds = log.duration_seconds; // store raw seconds; UI will interpret based on unit toggles later
           acc[eid].duration_unit = ((log as any).duration_unit as 'sec'|'min'|'hr') || 'min';
         }
@@ -301,6 +373,11 @@ const WorkoutSession = () => {
             logData.weight_per_set = exercise.sets.map(s => s.weight).join(',');
           }
           
+          // Save per-set completion state in notes field as a workaround until completed_sets column exists
+          // Format: __COMPLETION__:1,0,1,1 (hidden from user display)
+          const completionStr = exercise.sets.map(s => s.completed ? 1 : 0).join(',');
+          logData.notes = `__COMPLETION__:${completionStr}`;
+          
           return logData;
         }
       }
@@ -317,12 +394,13 @@ const WorkoutSession = () => {
 
   // Auto-save exercise logs when exercises change
   const autoSaveExerciseLogs = useCallback(() => {
+    if (!currentWorkout) return;
     const logs = buildExerciseLogs(exercises);
     if (logs.length > 0) {
       setSaveState('saving');
       autoSave.debouncedSaveExerciseLogs(logs);
     }
-  }, [exercises, buildExerciseLogs, autoSave.debouncedSaveExerciseLogs]);
+  }, [currentWorkout, exercises, buildExerciseLogs, autoSave.debouncedSaveExerciseLogs]);
 
   // Auto-save metadata when changed
   const autoSaveMetadata = useCallback((field: string, value: string) => {
@@ -371,19 +449,85 @@ const WorkoutSession = () => {
 
   // Trigger autosave when exercises change
   useEffect(() => {
-    if (currentWorkout && exercises.length > 0 && hasUnsavedChanges) {
-      autoSaveExerciseLogs();
+    if (currentWorkout && exercises.length > 0) {
+      const logs = buildExerciseLogs(exercises);
+      if (logs.length > 0) {
+        console.log('[WorkoutSession] Triggering autosave with logs:', logs);
+        setSaveState('saving');
+        autoSave.debouncedSaveExerciseLogs(logs);
+      }
     }
-  }, [exercises, autoSaveExerciseLogs, hasUnsavedChanges]);
+  }, [currentWorkout, exercises, buildExerciseLogs, autoSave.debouncedSaveExerciseLogs]);
 
-  // Timer
-  useEffect(()=>{ let int:any; if(isActive) int=setInterval(()=>{setDuration(d=>d+1); setHasUnsavedChanges(true);},1000); return ()=>clearInterval(int); }, [isActive]);
+  // Timer - timestamp-based to work in background even when page not visible
+  useEffect(() => {
+    let animationFrameId: number;
+    let intervalId: NodeJS.Timeout;
+    
+    const updateDuration = () => {
+      if (isActive && startTimeRef.current !== null) {
+        const now = Date.now();
+        const currentElapsed = Math.floor((now - startTimeRef.current) / 1000);
+        const totalDuration = elapsedBeforePauseRef.current + currentElapsed;
+        setDuration(totalDuration);
+        // Don't set hasUnsavedChanges - timer is persisted to localStorage separately
+      }
+    };
+
+    if (isActive) {
+      // Start timer if not already started
+      if (startTimeRef.current === null) {
+        startTimeRef.current = Date.now();
+      }
+      
+      // Update every second using setInterval (more reliable for background)
+      intervalId = setInterval(updateDuration, 1000);
+      
+      // Also update immediately
+      updateDuration();
+    } else {
+      // Timer paused - save elapsed time
+      if (startTimeRef.current !== null) {
+        const now = Date.now();
+        const currentElapsed = Math.floor((now - startTimeRef.current) / 1000);
+        elapsedBeforePauseRef.current += currentElapsed;
+        startTimeRef.current = null;
+      }
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [isActive]);
+
+  // Recalculate timer when page becomes visible (handles background timing)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isActive && startTimeRef.current !== null) {
+        // Page became visible - recalculate current duration
+        const now = Date.now();
+        const currentElapsed = Math.floor((now - startTimeRef.current) / 1000);
+        const totalDuration = elapsedBeforePauseRef.current + currentElapsed;
+        setDuration(totalDuration);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isActive]);
+
   const toggleSet=(eid:string,idx:number)=>{
+    console.log('[toggleSet] Called for exercise:', eid, 'set index:', idx);
     setHasUnsavedChanges(true);
-    setExercises(prev=>prev.map(ex=>{
-      if(ex.id!==eid) return ex;
-      return { ...ex, sets: ex.sets.map((s,i)=> i===idx ? { ...s, completed: !s.completed } : s) };
-    }));
+    setExercises(prev=>{
+      const updated = prev.map(ex=>{
+        if(ex.id!==eid) return ex;
+        return { ...ex, sets: ex.sets.map((s,i)=> i===idx ? { ...s, completed: !s.completed } : s) };
+      });
+      console.log('[toggleSet] Updated exercises:', updated);
+      return updated;
+    });
   };
   const updateSet=(eid:string,idx:number,field:'reps'|'weight',val:number)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>ex.id===eid?{...ex,sets:ex.sets.map((s,i)=>i===idx?{...s,[field]:val}:s)}:ex));};
   const toggleMode=(eid:string)=>{setHasUnsavedChanges(true);setExercises(p=>p.map(ex=>{
@@ -525,6 +669,8 @@ const WorkoutSession = () => {
     setHasUnsavedChanges(true); 
     setExercises(p=>[...p,newEx]); 
     setRecentExercises(prev=>{ const up=[newEx.id,...prev.filter(i=>i!==newEx.id)].slice(0,15); localStorage.setItem('recent-exercises', JSON.stringify(up)); return up; }); 
+    setExerciseDialogOpen(false); // Close dialog after adding
+    toast.success(`Added ${exercise.name}`); // Visual feedback
   };
   const toggleFavoriteExercise=(exerciseId:string)=>setFavoriteExercises(prev=>{ const up = prev.includes(exerciseId)?prev.filter(i=>i!==exerciseId):[...prev,exerciseId]; localStorage.setItem('favorite-exercises', JSON.stringify(up)); return up; });
 
@@ -548,6 +694,12 @@ const WorkoutSession = () => {
     // 3. We haven't already auto-marked this session
     if(allComplete && !previouslyAllCompleteRef.current && !currentWorkout.completed && !autoMarkedDoneRef.current){ 
       autoMarkedDoneRef.current = true; // flag so we know this was automatic
+      
+      // Pause timer when auto-completing
+      if (isActive) {
+        setIsActive(false);
+      }
+      
       completeWorkout.mutate({ sessionId: currentWorkout.session_id, completed: true }, { 
         onSuccess:()=>{ 
           confetti({ particleCount:80, spread:55, origin:{y:0.3} }); 
@@ -558,7 +710,7 @@ const WorkoutSession = () => {
     
     // Update the tracking ref for next render
     previouslyAllCompleteRef.current = allComplete;
-  }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending]);
+  }, [completedSets,totalSets,currentWorkout?.completed,currentWorkout?.session_id,completeWorkout.isPending,isActive]);
 
   // REMOVED: Auto-revert effects that caused loops
   // User has full manual control; completion state persists via autosave
@@ -569,6 +721,11 @@ const WorkoutSession = () => {
     
     // Manual user toggle should not be treated as auto-mark; clear auto flag so we don't immediately revert
     autoMarkedDoneRef.current=false; 
+    
+    // Stop timer when marking workout as done
+    if (markingDone && isActive) {
+      setIsActive(false);
+    }
     
     // Optimistic update: immediately update UI
     const queryKey = ['workout-sessions', currentWorkout.user_id];
@@ -1017,6 +1174,7 @@ const WorkoutSession = () => {
                                 min={0}
                                 max={exercise.distance_unit === 'm' ? 50000 : 50}
                                 step={exercise.distance_unit === 'm' ? 50 : 0.5}
+                                buttonStep={exercise.distance_unit === 'm' ? 250 : 5}
                                 unit=""
                                 className="flex-1 min-w-[180px]"
                               />
@@ -1164,6 +1322,7 @@ const WorkoutSession = () => {
                             min={0}
                             max={useLbs ? 400 : 180}
                             step={useLbs ? 2.5 : 0.5}
+                            buttonStep={useLbs ? 12.5 : 5}
                             unit={useLbs ? 'lbs' : 'kg'}
                             className="flex-1"
                           />
@@ -1178,7 +1337,7 @@ const WorkoutSession = () => {
                         )}
                       </div>
                       <div className="w-full flex flex-wrap gap-2 mt-3">
-                        {exercise.sets.map((set,idx)=>(<Button key={idx} variant={set.completed?'default':'outline'} size="sm" onClick={()=>toggleSet(exercise.id,idx)}>Set {set.setNumber} {set.completed?'✓':''}</Button>))}
+                        {exercise.sets.map((set,idx)=>(<Button key={idx} variant={set.completed?'default':'outline'} size="sm" onClick={()=>{toggleSet(exercise.id,idx); setHasUnsavedChanges(true);}}>Set {set.setNumber} {set.completed?'✓':''}</Button>))}
                       </div>
                     </>
                   )}
@@ -1336,6 +1495,7 @@ const WorkoutSession = () => {
                               min={0}
                               max={exercise.distance_unit === 'm' ? 50000 : 50}
                               step={exercise.distance_unit === 'm' ? 50 : 0.5}
+                              buttonStep={exercise.distance_unit === 'm' ? 250 : 5}
                               unit=""
                               className="flex-1"
                             />
@@ -1350,17 +1510,63 @@ const WorkoutSession = () => {
                         </div>
                       )}
                       <div className="flex justify-end">
-                        <Button variant={exercise.timeCompleted?'default':'outline'} size="sm" onClick={()=>setTimeCompleted(exercise.id,!exercise.timeCompleted)} title={exercise.timeCompleted?'Click to undo':'Mark as complete'}><Check className={`h-4 w-4 mr-2 ${exercise.timeCompleted?'text-white':''}`} />{exercise.timeCompleted?'Done':'Complete'}</Button>
+                        <Button variant={exercise.timeCompleted?'default':'outline'} size="sm" onClick={()=>{setTimeCompleted(exercise.id,!exercise.timeCompleted); setHasUnsavedChanges(true);}} title={exercise.timeCompleted?'Click to undo':'Mark as complete'}><Check className={`h-4 w-4 mr-2 ${exercise.timeCompleted?'text-white':''}`} />{exercise.timeCompleted?'Done':'Complete'}</Button>
                       </div>
                     </div>
                   ) : (
                     <>
                       {exercise.sets.map((set,index)=>(
-                        <div key={index} className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${set.completed?'bg-green-50 border border-green-200':'bg-muted/50 hover:bg-muted/70'}`}>
-                          <div className="w-8 text-center font-medium">{set.setNumber}</div>
-                          {exercise.enableReps!==false && (<div className="flex items-center gap-2"><label className="text-sm font-medium w-12">Reps:</label><NumberStepper value={set.reps} onChange={v=>updateSet(exercise.id,index,'reps',v)} min={0} max={50} step={1} unit="" disabled={set.completed} className="w-20" /></div>)}
-                          {exercise.enableWeight!==false && (<div className="flex items-center gap-2"><label className="text-sm font-medium w-16">Weight:</label><NumberStepper value={useLbs?Math.round(set.weight*2.20462*2)/2:set.weight} onChange={v=>{ const kg=useLbs?Math.round(v/2.20462*2)/2:v; updateSet(exercise.id,index,'weight',kg); }} min={0} max={useLbs?400:180} step={useLbs?2.5:0.5} unit={useLbs?'lbs':'kg'} disabled={set.completed} className="w-24" /></div>)}
-                          <Button variant={set.completed?'default':'outline'} size="sm" onClick={()=>toggleSet(exercise.id,index)} className="ml-auto" title={set.completed?'Click to undo':'Mark as complete'}><Check className={`h-4 w-4 mr-2 ${set.completed?'text-white':''}`} />{set.completed?'Done':'Complete'}</Button>
+                        <div key={index} className={`flex gap-3 p-4 rounded-lg transition-colors ${set.completed?'bg-green-50 border border-green-200':'bg-muted/50 hover:bg-muted/70'}`}>
+                          {/* Set number */}
+                          <div className="w-8 text-center font-medium self-start pt-2">{set.setNumber}</div>
+                          
+                          {/* Reps and Weight stacked vertically, always */}
+                          <div className="flex flex-col gap-3 flex-1">
+                            {exercise.enableReps!==false && (
+                              <div className="flex items-start gap-2">
+                                <label className="text-sm font-medium w-16 shrink-0 text-left pt-2">Reps:</label>
+                                <NumberStepper 
+                                  value={set.reps} 
+                                  onChange={v=>updateSet(exercise.id,index,'reps',v)} 
+                                  min={0} 
+                                  max={50} 
+                                  step={1} 
+                                  unit="" 
+                                  disabled={set.completed} 
+                                  className="flex-1 max-w-[200px]" 
+                                />
+                              </div>
+                            )}
+                            {exercise.enableWeight!==false && (
+                              <div className="flex items-start gap-2">
+                                <label className="text-sm font-medium w-16 shrink-0 text-left pt-2">Weight:</label>
+                                <NumberStepper 
+                                  value={useLbs?Math.round(set.weight*2.20462*2)/2:set.weight} 
+                                  onChange={v=>{ const kg=useLbs?Math.round(v/2.20462*2)/2:v; updateSet(exercise.id,index,'weight',kg); }} 
+                                  min={0} 
+                                  max={useLbs?400:180} 
+                                  step={useLbs?2.5:0.5} 
+                                  buttonStep={useLbs?12.5:5} 
+                                  unit={useLbs?'lbs':'kg'} 
+                                  disabled={set.completed} 
+                                  className="flex-1 max-w-[200px]" 
+                                />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Complete button in top right */}
+                          <div className="self-start">
+                            <Button 
+                              variant={set.completed?'default':'outline'} 
+                              size="sm" 
+                              onClick={()=>{toggleSet(exercise.id,index); setHasUnsavedChanges(true);}} 
+                              title={set.completed?'Click to undo':'Mark as complete'}
+                            >
+                              <Check className={`h-4 w-4 mr-2 ${set.completed?'text-white':''}`} />
+                              {set.completed?'Done':'Complete'}
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </>

@@ -32,6 +32,7 @@ import DynamicScrollLanding from "./pages/AppleScrollLanding";
 import Bin from "./pages/Bin";
 import { UnitPreferenceProvider } from "@/contexts/UnitPreferenceContext";
 import { WorkoutDraftButton } from "@/components/layout/WorkoutDraftButton";
+import { OngoingWorkoutButton } from "@/components/layout/OngoingWorkoutButton";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
                               </main>
                             </div>
                             <WorkoutDraftButton />
+                            <OngoingWorkoutButton />
                           </div>
                         </SidebarProvider>
                       </UnitPreferenceProvider>
